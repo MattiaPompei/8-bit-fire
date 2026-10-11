@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>8-bit fire</title>
+<meta name="theme-color" content="#0c0a09">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon-32.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="description" content="Un fuoco in pixel da tenere acceso sul telefono: progetto, controlli, design system e note tecniche.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -77,6 +81,16 @@ footer div { max-width: 880px; margin: 0 auto; padding: 32px 24px 48px; color: v
 </header>
 
 <main>
+  <section aria-labelledby="s-installa">
+    <h2 id="s-installa">Installa sul telefono</h2>
+    <p class="muted">8-bit fire è una web app: si installa dal browser, senza store, e dopo la prima apertura funziona anche offline. Per condividerla basta mandare il link <a href="play.html">mattiapompei.github.io/8-bit-fire/play.html</a>.</p>
+    <div class="grid2">
+      <div><h3>iPhone e iPad</h3><p class="muted">Apri il link in Safari, tocca Condividi, poi "Aggiungi alla schermata Home". L'app si apre a tutto schermo, senza le barre di Safari.</p></div>
+      <div><h3>Android</h3><p class="muted">Apri il link in Chrome e tocca "Installa app", oppure il menu ⋮ e "Aggiungi a schermata Home".</p></div>
+      <div><h3>Computer</h3><p class="muted">In Chrome o Edge usa l'icona di installazione nella barra degli indirizzi.</p></div>
+    </div>
+  </section>
+
   <section aria-labelledby="s-gesti">
     <h2 id="s-gesti">Come si gioca</h2>
     <p class="muted">Il fuoco si comanda con le dita direttamente sopra le fiamme, oppure con il pannello in basso.</p>
@@ -197,6 +211,7 @@ footer div { max-width: 880px; margin: 0 auto; padding: 32px 24px 48px; color: v
   size();
   addEventListener('resize', () => { clearTimeout(size.t); size.t = setTimeout(size, 150); });
   if (!matchMedia('(prefers-reduced-motion: reduce)').matches) setInterval(() => { step(); draw(); }, 50);
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
 </script>
 </body>

@@ -2,10 +2,18 @@
 
 Un fuoco in pixel da tenere acceso sul telefono: si accende, si scalda e si piega al vento con un dito. Una sola pagina HTML, senza dipendenze, con il suono del fuoco incorporato.
 
-- **Gioca**: [docs/play.html](docs/play.html) (con GitHub Pages attivo: `https://<utente>.github.io/8-bit-fire/play.html`)
-- **Pagina del progetto**: [docs/index.html](docs/index.html)
+- **Gioca**: https://mattiapompei.github.io/8-bit-fire/play.html
+- **Pagina del progetto**: https://mattiapompei.github.io/8-bit-fire/
 - **Versione pubblicata su Claude**: https://claude.ai/artifact/5o4Hq4Dfce5iaVeKwnWdHo
 - **Design system** (privato): https://claude.ai/artifact/TpYa1XftPX4Qgz9dA1XhXQ
+
+## Installa sul telefono
+
+8-bit fire è una PWA: si installa dal browser, senza store, e dopo la prima apertura funziona offline.
+
+- **iPhone e iPad**: apri il link in Safari → Condividi → "Aggiungi alla schermata Home".
+- **Android**: apri il link in Chrome → "Installa app" (oppure ⋮ → "Aggiungi a schermata Home").
+- **Computer**: in Chrome o Edge, icona di installazione nella barra degli indirizzi.
 
 ## Come si gioca
 
@@ -32,14 +40,16 @@ L'audio sono due registrazioni in loop, mixate in dissolvenza secondo l'intensit
 |---|---|
 | `2026-10-11_8-bit-fire_App_v02.html` | versione attuale dell'app (file sorgente) |
 | `2026-10-11_8-bit-fire_App_v01.html` | versione precedente |
-| `docs/play.html` | copia dell'app servita da GitHub Pages |
+| `docs/play.html` | l'app per GitHub Pages, generata da `tools/build_pages.py` |
+| `docs/manifest.webmanifest`, `docs/sw.js`, `docs/icons/` | PWA: manifest, service worker (offline), icone |
+| `tools/` | `build_pages.py` (genera `docs/play.html` e `docs/sw.js`), `make_icons.py` (icone pixel) |
 | `docs/index.html` | pagina con tutte le informazioni sul progetto |
 | `design-system/` | token, brand book, sezioni (fuoco, interazioni, animazioni, audio), componenti con anteprime, icone SVG |
 | `audio/` | registrazioni originali (mp3), versioni AAC incorporate nell'app (m4a), audio muto per iPhone |
 | `*_Design-critique_v01.md` | critica di design |
 | `*_Accessibility-review_v01.md` | audit WCAG 2.1 AA |
 
-I file seguono la convenzione `AAAA-MM-GG_Progetto_Descrizione_vNN`. Quando aggiorni l'app, copia la nuova versione anche in `docs/play.html`.
+I file seguono la convenzione `AAAA-MM-GG_Progetto_Descrizione_vNN`. Dopo ogni nuova versione dell'app lancia `python3 tools/build_pages.py`: rigenera `docs/play.html` dalla versione più recente e aggiorna la cache del service worker, così i telefoni ricevono l'aggiornamento.
 
 ## Design system in breve
 
@@ -50,6 +60,6 @@ I file seguono la convenzione `AAAA-MM-GG_Progetto_Descrizione_vNN`. Quando aggi
 
 ## Crediti
 
-- Suoni del fuoco: SoundReality (`fire-sound-334130`, `blazing-fire-394355`). Verifica che la licenza consenta la pubblicazione in un repository pubblico.
+- Suoni del fuoco: SoundReality (`fire-sound-334130`, `blazing-fire-394355`), royalty free.
 - Algoritmo del fuoco: tecnica del fuoco di Doom (PSX).
 - Progetto e direzione: Mattia. Sviluppo con Claude.
