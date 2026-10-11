@@ -1,0 +1,25 @@
+<!-- @dsCard group="Azioni" height=210 subtitle="Riposo, hover, premuto, selezionato, disattivato" -->
+<!doctype html>
+<html lang="it">
+<head><meta charset="utf-8"><title>SecondaryButton</title>
+<style>
+html, body { margin: 0; }
+body { background: var(--panel); padding: 16px; }
+.grid { display: grid; grid-template-columns: repeat(4, 56px); gap: 16px 24px; align-items: end; } .cell { display: grid; gap: 6px; justify-items: center; } .cap { color: var(--label); font-size: 11px; text-align: center; } .ef-btn-2 { width: 56px; }
+</style>
+</head>
+<body class="ef">
+<div class="grid">
+  <div class="cell"><button class="ef-btn ef-btn-2" type="button" aria-label="Riposo"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button><span class="cap">riposo</span></div>
+  <div class="cell"><button class="ef-btn ef-btn-2 is-hover" type="button" aria-label="Hover"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button><span class="cap">hover</span></div>
+  <div class="cell"><button class="ef-btn ef-btn-2 is-active" type="button" aria-label="Premuto"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button><span class="cap">premuto</span></div>
+  <div class="cell"><button class="ef-btn ef-btn-2" type="button" disabled aria-label="Disattivato"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button><span class="cap">disattivato</span></div>
+  <div class="cell"><button class="ef-btn ef-btn-2" role="radio" aria-checked="true" type="button" aria-label="Selezionato"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button><span class="cap">selezionato</span></div>
+  <div class="cell"><button class="ef-btn ef-btn-2 is-hover" role="radio" aria-checked="true" type="button" aria-label="Selezionato in hover"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button><span class="cap">sel. + hover</span></div>
+  <div class="cell"><button class="ef-btn ef-btn-2 ef-glass" aria-pressed="true" type="button" aria-label="Audio attivo"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg></button><span class="cap">vetro, attivo</span></div>
+  <div class="cell"><button class="ef-btn ef-btn-2 ef-glass ef-txt" type="button">Esci</button><span class="cap">Esci</span></div>
+  <div class="cell"><button class="ef-btn ef-btn-2 ef-glass" type="button" aria-label="Controlli"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg></button><span class="cap">Controlli</span></div>
+</div>
+
+</body>
+</html>

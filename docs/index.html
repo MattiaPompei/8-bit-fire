@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>8-bit fire</title>
+<meta name="description" content="Un fuoco in pixel da tenere acceso sul telefono: progetto, controlli, design system e note tecniche.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Silkscreen:wght@700&display=swap">
+<style>
+/* Pagina del progetto: stessi token del design system 8-bit fire (tema unico scuro, griglia di 8px). */
+:root {
+  --bg: #0c0a09; --stage: #070707; --panel: #141210; --btn: #2c2723; --line: rgba(255, 255, 255, 0.08);
+  --fg: #f4f1ec; --label: #c4bcb2; --accent: #e2561a; --ink: #1a0a02; --focus: #ffd9a8;
+  --font-ui: "IBM Plex Mono", ui-monospace, Menlo, monospace; --font-pixel: "Silkscreen", "Courier New", monospace;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 15px; line-height: 1.6; }
+a { color: var(--focus); text-underline-offset: 3px; }
+a:focus-visible, .btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.hero { position: relative; overflow: hidden; background: var(--stage); border-bottom: 1px solid var(--line); }
+.hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; opacity: 0.55; }
+.hero-inner { position: relative; max-width: 880px; margin: 0 auto; padding: 96px 24px 64px; display: grid; gap: 24px; }
+.title {
+  margin: 0; font-family: var(--font-pixel); font-weight: 700; font-size: clamp(36px, 9vw, 72px); line-height: 1; text-transform: uppercase;
+  background: linear-gradient(to bottom, var(--focus) 0 63%, var(--accent) 63% 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0.0625em 0 0 var(--bg)) drop-shadow(-0.0625em 0 0 var(--bg)) drop-shadow(0 0.0625em 0 var(--bg)) drop-shadow(0 -0.0625em 0 var(--bg)) drop-shadow(0.0625em 0.0625em 0 var(--bg)) drop-shadow(0.0625em 0.0625em 0 var(--bg));
+}
+.lead { margin: 0; max-width: 52ch; color: var(--label); font-size: 16px; }
+.actions { display: flex; flex-wrap: wrap; gap: 16px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 56px; padding: 0 24px; border-radius: 8px; font: 600 16px/1 var(--font-ui); text-decoration: none; transition: transform 160ms var(--ease-out), background-color 150ms ease; }
+.btn:active { transform: scale(0.97); }
+.btn.primary { background: var(--accent); color: var(--ink); }
+.btn.secondary { background: var(--btn); color: var(--fg); font-size: 14px; min-height: 48px; align-self: center; }
+@media (hover: hover) and (pointer: fine) { .btn.primary:hover { background: #ef6a2c; } .btn.secondary:hover { background: #332d28; } }
+
+main { max-width: 880px; margin: 0 auto; padding: 64px 24px 96px; display: grid; gap: 64px; }
+section { display: grid; gap: 16px; }
+h2 { margin: 0; font-size: 20px; font-weight: 600; }
+h3 { margin: 0; font-size: 15px; font-weight: 600; }
+p { margin: 0; max-width: 65ch; }
+.muted { color: var(--label); }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; vertical-align: top; padding: 12px 16px 12px 0; border-bottom: 1px solid var(--line); }
+th { color: var(--label); font-weight: 500; font-size: 12px; letter-spacing: 0.02em; }
+.table-wrap { overflow-x: auto; }
+kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 28px; padding: 0 8px; border-radius: 8px; background: var(--btn); font: 500 12px/1 var(--font-ui); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.35); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px 32px; }
+.palette { display: grid; grid-template-columns: repeat(37, 1fr); height: 32px; border-radius: 8px; overflow: hidden; }
+.swatches { display: flex; flex-wrap: wrap; gap: 16px; }
+.sw { display: grid; gap: 8px; font-size: 12px; color: var(--label); }
+.sw i { display: block; width: 72px; height: 48px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--line); }
+ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 8px; max-width: 65ch; }
+code { font-family: var(--font-ui); font-size: 0.92em; color: var(--focus); }
+footer { border-top: 1px solid var(--line); }
+footer div { max-width: 880px; margin: 0 auto; padding: 32px 24px 48px; color: var(--label); font-size: 13px; }
+@media (prefers-reduced-motion: reduce) { .btn { transition: none; } }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <canvas id="fire" aria-hidden="true"></canvas>
+  <div class="hero-inner">
+    <h1 class="title">8-bit fire</h1>
+    <p class="lead">Un fuoco in pixel da tenere acceso sul telefono: si accende, si scalda e si piega al vento con un dito. Una sola pagina HTML, con il suono del fuoco incorporato.</p>
+    <div class="actions">
+      <a class="btn primary" href="play.html">Accendi il fuoco</a>
+      <a class="btn secondary" href="https://claude.ai/artifact/5o4Hq4Dfce5iaVeKwnWdHo">Versione su Claude</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section aria-labelledby="s-gesti">
+    <h2 id="s-gesti">Come si gioca</h2>
+    <p class="muted">Il fuoco si comanda con le dita direttamente sopra le fiamme, oppure con il pannello in basso.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th scope="col">Gesto</th><th scope="col">Effetto</th></tr></thead>
+      <tbody>
+        <tr><td>Tocco al centro</td><td>Riaccende il fuoco spento. A fuoco acceso servono due tocchi ravvicinati per spegnerlo.</td></tr>
+        <tr><td>Trascina in su o in giù</td><td>Intensità da 1 a 10; il valore segue il dito e si ferma sul livello più vicino.</td></tr>
+        <tr><td>Trascina a sinistra o a destra</td><td>Vento a passi: sinistra, fermo, destra. Solo a fuoco acceso.</td></tr>
+        <tr><td>A fuoco spento, trascina in su</td><td>Riaccende il fuoco partendo da intensità 1.</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section aria-labelledby="s-controlli">
+    <h2 id="s-controlli">Controlli</h2>
+    <div class="grid2">
+      <div><h3>Pannello</h3><p class="muted">Vento con tre frecce (sinistra, dritto, destra), intensità con lo slider a fiamma, accensione e impostazioni. A fuoco acceso il pulsante è neutro, a fuoco spento arancio.</p></div>
+      <div><h3>Impostazioni</h3><p class="muted">Altezza delle fiamme (10-100%), dimensione delle celle (4-48 px), velocità (20-60 fps), Controlli e gesti, Ripristina valori predefiniti. Su desktop il pannello entra da destra.</p></div>
+      <div><h3>In alto</h3><p class="muted">Esci a sinistra torna alla splash. A destra audio e schermo intero.</p></div>
+      <div><h3>Pagina Controlli</h3><p class="muted">Dal pulsante "i" della splash o dalle impostazioni: spiega ogni controllo con piccole dimostrazioni animate dei gesti.</p></div>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th scope="col">Tasto</th><th scope="col">Azione</th></tr></thead>
+      <tbody>
+        <tr><td><kbd>Spazio</kbd></td><td>Accende e spegne</td></tr>
+        <tr><td><kbd>+</kbd> <kbd>−</kbd></td><td>Intensità</td></tr>
+        <tr><td><kbd>←</kbd> <kbd>↓</kbd> <kbd>→</kbd></td><td>Vento: sinistra, fermo, destra</td></tr>
+        <tr><td><kbd>F</kbd> <kbd>M</kbd> <kbd>H</kbd></td><td>Schermo intero, audio, nasconde l'interfaccia</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>Chiude impostazioni e Controlli</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section aria-labelledby="s-tecnica">
+    <h2 id="s-tecnica">Come funziona il fuoco</h2>
+    <p>Una griglia di celle da 0 a 36, ognuna con un colore della palette dal nero al bianco. La riga in fondo vale la temperatura di base (36 × intensità / 10). A ogni passo ogni cella prende il valore della cella sotto, sottrae a caso 0, 1 o 2 e si sposta dello stesso numero di colonne nel verso del vento. È la tecnica del fuoco di Doom per PlayStation.</p>
+    <div class="palette" id="palette" role="img" aria-label="Palette del fuoco: 37 colori dal nero al bianco passando per rosso, arancio e giallo"></div>
+    <ul class="plain muted">
+      <li>La base insegue l'intensità con una costante di tempo di 120 ms: ogni cambio è morbido.</li>
+      <li>L'altezza regola la probabilità del sottratto; le celle sono pixel di un canvas ingrandito con <code>image-rendering: pixelated</code>.</li>
+      <li>Simulazione a passo fisso (20-60 fps), indipendente dal refresh dello schermo.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="s-audio">
+    <h2 id="s-audio">Audio</h2>
+    <p class="muted">Due registrazioni in loop, incorporate nella pagina, mixate secondo l'intensità: fuoco basso 95% e alto 5% a intensità 1, 60/40 a 7, 25/75 a 10. Volume generale al 70%, al 50% con le impostazioni aperte. Accensione e spegnimento hanno due suoni di rumore filtrato generati con Web Audio. Su iPhone l'audio si sente anche con il tasto silenzioso.</p>
+  </section>
+
+  <section aria-labelledby="s-ds">
+    <h2 id="s-ds">Design system</h2>
+    <p class="muted">Tema unico scuro, un solo accento, griglia di 8px. File completi in <code>design-system/</code> (token, brand book, componenti con anteprime, icone).</p>
+    <div class="swatches">
+      <div class="sw"><i style="background:#0c0a09"></i>bg</div>
+      <div class="sw"><i style="background:#141210"></i>panel</div>
+      <div class="sw"><i style="background:#2c2723"></i>btn</div>
+      <div class="sw"><i style="background:#e2561a"></i>accent</div>
+      <div class="sw"><i style="background:#ffd9a8"></i>focus</div>
+      <div class="sw"><i style="background:#f4f1ec"></i>fg</div>
+    </div>
+    <div class="grid2">
+      <div><h3>Tipografia</h3><p class="muted">IBM Plex Mono per tutta l'interfaccia (chiave 12px, valore 16px). Silkscreen solo per il titolo pixel a due toni.</p></div>
+      <div><h3>Spazi e forme</h3><p class="muted">Margine esterno 24px, distanze 16px, tap area 48px, pulsanti primari 56px. Un solo raggio, 8px.</p></div>
+      <div><h3>Movimento</h3><p class="muted">Tre curve: <code>ease-out</code>, <code>ease-drawer</code>, <code>ease-in-out</code>. Pressioni 160 ms, valori 180 ms, pannelli 500/300 ms. Mai ease-in; dissolvenze con movimento ridotto.</p></div>
+      <div><h3>Accessibilità</h3><p class="muted">Contrasti AA su pannello e HUD, nomi accessibili per ogni controllo, annunci del valore finale dei gesti, focus visibile, gioco inerte sotto la splash.</p></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="s-repo">
+    <h2 id="s-repo">Struttura del repository</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th scope="col">Percorso</th><th scope="col">Contenuto</th></tr></thead>
+      <tbody>
+        <tr><td><code>*_App_v02.html</code></td><td>Versione attuale dell'app</td></tr>
+        <tr><td><code>docs/</code></td><td>Questa pagina e <code>play.html</code>, serviti da GitHub Pages</td></tr>
+        <tr><td><code>design-system/</code></td><td>Token, brand book, componenti, icone</td></tr>
+        <tr><td><code>audio/</code></td><td>Registrazioni originali e versioni incorporate</td></tr>
+        <tr><td><code>*_Design-critique_v01.md</code>, <code>*_Accessibility-review_v01.md</code></td><td>Critica di design e audit WCAG 2.1 AA</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section aria-labelledby="s-crediti">
+    <h2 id="s-crediti">Crediti</h2>
+    <p class="muted">Suoni del fuoco: SoundReality. Algoritmo: fuoco di Doom (PSX). Font: IBM Plex Mono e Silkscreen, da Google Fonts.</p>
+  </section>
+</main>
+
+<footer><div>8-bit fire · 2026</div></footer>
+
+<script>
+(() => {
+  const P = [[7,7,7],[31,7,7],[47,15,7],[71,15,7],[87,23,7],[103,31,7],[119,31,7],[143,39,7],[159,47,7],[175,63,7],[191,71,7],[199,71,7],[223,79,7],[223,87,7],[223,87,7],[215,95,7],[215,95,7],[215,103,15],[207,111,15],[207,119,15],[207,127,15],[207,135,23],[199,135,23],[199,143,23],[199,151,31],[191,159,31],[191,159,31],[191,167,39],[191,167,39],[191,175,47],[183,175,47],[183,183,47],[183,183,55],[207,207,111],[223,223,159],[239,239,199],[255,255,255]];
+  const pal = document.getElementById('palette');
+  P.forEach(c => { const i = document.createElement('i'); i.style.background = `rgb(${c})`; pal.appendChild(i); });
+  // fuoco decorativo nella testata, fermo con movimento ridotto
+  const cv = document.getElementById('fire'), ctx = cv.getContext('2d'), CELL = 8;
+  let W, H, cells, img, px;
+  const PAL32 = P.map(([r, g, b]) => ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0);
+  function size() {
+    W = Math.ceil(cv.clientWidth / CELL); H = Math.ceil(cv.clientHeight / CELL);
+    cv.width = W; cv.height = H; cells = new Uint8Array(W * H);
+    img = ctx.createImageData(W, H); px = new Uint32Array(img.data.buffer);
+    for (let i = 0; i < H; i++) step();
+    draw();
+  }
+  function step() {
+    for (let x = 0; x < W; x++) cells[(H - 1) * W + x] = 25;
+    const d = 36 / H, n = d <= 1.4 ? 2 : Math.ceil(d / 0.7), p = Math.min(1, d / n);
+    for (let y = 0; y < H - 1; y++) for (let x = 0; x < W; x++) {
+      let r = 0; for (let k = 0; k < n; k++) if (Math.random() < p) r++;
+      const v = cells[(y + 1) * W + x]; let tx = x - r; while (tx < 0) tx += W;
+      cells[y * W + tx] = v > r ? v - r : 0;
+    }
+  }
+  function draw() { for (let i = 0; i < cells.length; i++) px[i] = PAL32[cells[i]]; ctx.putImageData(img, 0, 0); }
+  size();
+  addEventListener('resize', () => { clearTimeout(size.t); size.t = setTimeout(size, 150); });
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) setInterval(() => { step(); draw(); }, 50);
+})();
+</script>
+</body>
+</html>

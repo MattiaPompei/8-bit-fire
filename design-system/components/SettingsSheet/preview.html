@@ -1,0 +1,22 @@
+<!-- @dsCard group="Superfici" height=400 width=420 subtitle="Foglio impostazioni" -->
+<!doctype html>
+<html lang="it">
+<head><meta charset="utf-8"><title>SettingsSheet</title>
+<style>
+html, body { margin: 0; }
+body { background: var(--panel); padding: 16px; }
+body { padding: 16px 0 0; background: var(--stage); } .reset { width: 100%; }
+</style>
+</head>
+<body class="ef">
+<section class="ef-sheet" aria-labelledby="t">
+  <div class="ef-sheet-head"><h2 id="t">Impostazioni</h2><button class="ef-btn ef-btn-2" type="button" aria-label="Chiudi"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div class="ef-row"><div class="ef-meta"><span class="ef-key">Altezza</span><output class="ef-value">100%</output></div><input class="ef-slider" type="range" min="10" max="100" step="5" value="100" aria-label="Altezza" style="--pct:100%"></div>
+  <div class="ef-row"><div class="ef-meta"><span class="ef-key">Celle</span><output class="ef-value">8 px</output></div><input class="ef-slider" type="range" min="0" max="5" step="1" value="1" aria-label="Celle" style="--pct:20%"></div>
+  <div class="ef-row"><div class="ef-meta"><span class="ef-key">Velocità</span><output class="ef-value">20 fps</output></div><input class="ef-slider" type="range" min="20" max="60" step="5" value="20" aria-label="Velocità" style="--pct:0%"></div>
+  <button class="ef-btn ef-btn-2 ef-txt reset" type="button">Controlli e gesti</button>
+  <button class="ef-btn ef-primary reset" type="button">Ripristina valori predefiniti</button>
+</section>
+
+</body>
+</html>

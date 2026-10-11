@@ -1,0 +1,1 @@
+Icone a linea dell'interfaccia: 24px su viewBox 24, tratto 2px, estremità tonde. I file sono a inchiostro `fg` (#f4f1ec) per essere visibili su fondo scuro; nel prodotto vanno inline con `stroke="currentColor"`. `info.svg` apre la pagina Controlli dalla splash. `flame-thumb.svg` è il cursore dell'intensità (35×45): fiamma `fg` con stacco di 2px in `panel`.

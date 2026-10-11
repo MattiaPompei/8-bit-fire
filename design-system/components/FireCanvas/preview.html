@@ -1,0 +1,47 @@
+<!-- @dsCard group="Fuoco" height=300 subtitle="La simulazione con la palette fire-00 … fire-36" -->
+<!doctype html>
+<html lang="it">
+<head><meta charset="utf-8"><title>FireCanvas</title>
+<style>
+html, body { margin: 0; }
+body { background: var(--panel); padding: 16px; }
+body { padding: 0; background: var(--stage); } canvas { display: block; width: 100%; height: 240px; image-rendering: pixelated; } .strip { display: grid; grid-template-columns: repeat(37, 1fr); height: 28px; } .strip i { display: block; }
+</style>
+</head>
+<body class="ef">
+<canvas id="f" aria-label="Fuoco in pixel, intensità 7, vento a sinistra"></canvas>
+<div class="strip" id="s" aria-hidden="true"></div>
+<script>
+function firePalette() {
+  var cs = getComputedStyle(document.documentElement), out = [];
+  for (var i = 0; i <= 36; i++) {
+    var v = cs.getPropertyValue('--fire-' + (i < 10 ? '0' : '') + i).trim() || '#070707';
+    var n = parseInt(v.replace('#', ''), 16);
+    out.push(((255 << 24) | ((n & 255) << 16) | (((n >> 8) & 255) << 8) | ((n >> 16) & 255)) >>> 0);
+  }
+  return out;
+}
+function startFire(cv, cell, level, wind) {
+  var W = Math.ceil(cv.clientWidth / cell), H = Math.ceil(cv.clientHeight / cell);
+  cv.width = W; cv.height = H;
+  var ctx = cv.getContext('2d'), img = ctx.createImageData(W, H), px = new Uint32Array(img.data.buffer);
+  var c = new Uint8Array(W * H), pal = firePalette(), b = Math.round(36 * level / 10);
+  var d = 36 / H, n = d <= 1.4 ? 2 : Math.ceil(d / 0.7), p = Math.min(1, d / n);
+  function step() {
+    for (var x = 0; x < W; x++) c[(H - 1) * W + x] = b;
+    for (var y = 0; y < H - 1; y++) for (var x2 = 0; x2 < W; x2++) {
+      var r = 0; for (var k = 0; k < n; k++) if (Math.random() < p) r++;
+      var v = c[(y + 1) * W + x2], tx = x2 + wind * r;
+      while (tx < 0) tx += W; while (tx >= W) tx -= W;
+      c[y * W + tx] = v > r ? v - r : 0;
+    }
+  }
+  function draw() { for (var i = 0; i < c.length; i++) px[i] = pal[c[i]]; ctx.putImageData(img, 0, 0); }
+  for (var i = 0; i < H; i++) step();
+  draw();
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  setInterval(function () { step(); draw(); }, 50);
+}
+startFire(document.getElementById('f'), 8, 7, -1); var s = document.getElementById('s'); for (var i = 0; i <= 36; i++) { var e = document.createElement('i'); e.style.background = 'var(--fire-' + (i < 10 ? '0' : '') + i + ')'; s.appendChild(e); }</script>
+</body>
+</html>

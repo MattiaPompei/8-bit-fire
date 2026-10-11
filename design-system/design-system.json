@@ -1,0 +1,113 @@
+{
+  "v": 3,
+  "layout": "files",
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-10-11T15:18:31Z"
+  },
+  "title": "8-bit fire",
+  "namespace": "EightBitFire",
+  "libraries": [],
+  "sections": {},
+  "groups": [
+    "Icone"
+  ],
+  "assetGroups": {
+    "Icone": {
+      "name": "Icone",
+      "tile": "s",
+      "order": [
+        "flame-thumb.svg",
+        "wind-left.svg",
+        "wind-still.svg",
+        "wind-right.svg",
+        "sound-off.svg",
+        "sound-on.svg",
+        "fullscreen-enter.svg",
+        "fullscreen-exit.svg",
+        "settings.svg",
+        "close.svg",
+        "info.svg"
+      ],
+      "files": {
+        "flame-thumb.svg": {
+          "name": "flame-thumb.svg",
+          "blob": "354eaa91ea3f2c63c2a5d742aa896082",
+          "size": 867,
+          "type": "image/svg+xml"
+        },
+        "wind-left.svg": {
+          "name": "wind-left.svg",
+          "blob": "c2c3999f5a5a002baca4af3e176564d8",
+          "size": 222,
+          "type": "image/svg+xml"
+        },
+        "wind-still.svg": {
+          "name": "wind-still.svg",
+          "blob": "16f0f08d9550d8295b5e8f966aff87eb",
+          "size": 221,
+          "type": "image/svg+xml"
+        },
+        "wind-right.svg": {
+          "name": "wind-right.svg",
+          "blob": "83d53e602b63003d60aa7b27a06cacac",
+          "size": 221,
+          "type": "image/svg+xml"
+        },
+        "sound-off.svg": {
+          "name": "sound-off.svg",
+          "blob": "d5fe01973884a17aee17ad1d67124da0",
+          "size": 262,
+          "type": "image/svg+xml"
+        },
+        "sound-on.svg": {
+          "name": "sound-on.svg",
+          "blob": "12fe990341e80ab5e53a261827634404",
+          "size": 286,
+          "type": "image/svg+xml"
+        },
+        "fullscreen-enter.svg": {
+          "name": "fullscreen-enter.svg",
+          "blob": "23151973b283228ad153216935fde457",
+          "size": 238,
+          "type": "image/svg+xml"
+        },
+        "fullscreen-exit.svg": {
+          "name": "fullscreen-exit.svg",
+          "blob": "8725035e6209c1b79c3840616ac23f15",
+          "size": 238,
+          "type": "image/svg+xml"
+        },
+        "settings.svg": {
+          "name": "settings.svg",
+          "blob": "c9f8baad1ec42751dff552365ca2ac99",
+          "size": 306,
+          "type": "image/svg+xml"
+        },
+        "close.svg": {
+          "name": "close.svg",
+          "blob": "18889a6de7c3d0e0d73084e784b02cc8",
+          "size": 220,
+          "type": "image/svg+xml"
+        },
+        "info.svg": {
+          "name": "info.svg",
+          "blob": "088af0081c8ee05f956239315fd4885e",
+          "size": 258,
+          "type": "image/svg+xml"
+        }
+      }
+    }
+  },
+  "blobs": {},
+  "docs": {
+    "readme": "project/README.md",
+    "sections": []
+  },
+  "lastChange": {
+    "by": "Claude",
+    "at": "2026-10-11T16:11:41Z",
+    "via": "Claude Code",
+    "note": "Impostazioni e Controlli entrano da destra; Controlli annidati nel pannello impostazioni con Indietro; Esci in alto a sinistra."
+  }
+}

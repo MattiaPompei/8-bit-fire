@@ -1,0 +1,19 @@
+<!-- @dsCard group="Controlli" height=220 subtitle="Slider a 10 scatti con cursore a fiamma" -->
+<!doctype html>
+<html lang="it">
+<head><meta charset="utf-8"><title>IntensitySlider</title>
+<style>
+html, body { margin: 0; }
+body { background: var(--panel); padding: 16px; }
+.stack { display: grid; gap: 16px; max-width: 448px; }
+</style>
+</head>
+<body class="ef">
+<div class="stack">
+  <div class="ef-row"><div class="ef-meta"><span class="ef-key">Intensità</span><output class="ef-value">1/10</output></div><input class="ef-slider is-flame" type="range" min="1" max="10" step="1" value="1" aria-label="Intensità" style="--pct:0%"></div>
+  <div class="ef-row"><div class="ef-meta"><span class="ef-key">Intensità</span><output class="ef-value">7/10</output></div><input class="ef-slider is-flame" type="range" min="1" max="10" step="1" value="7" aria-label="Intensità" style="--pct:66.7%"></div>
+  <div class="ef-row"><div class="ef-meta"><span class="ef-key">Intensità</span><output class="ef-value">10/10</output></div><input class="ef-slider is-flame" type="range" min="1" max="10" step="1" value="10" aria-label="Intensità" style="--pct:100%"></div>
+</div>
+
+</body>
+</html>

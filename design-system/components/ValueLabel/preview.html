@@ -1,0 +1,35 @@
+<!-- @dsCard group="Testi" height=120 subtitle="Chiave/valore con rotazione e scorrimento" -->
+<!doctype html>
+<html lang="it">
+<head><meta charset="utf-8"><title>ValueLabel</title>
+<style>
+html, body { margin: 0; }
+body { background: var(--panel); padding: 16px; }
+.pairs { display: flex; gap: 48px; }
+</style>
+</head>
+<body class="ef">
+<div class="pairs">
+  <div class="ef-meta"><span class="ef-key">Intensità</span><output class="ef-value"><span class="ef-roll v" id="num"><span>7</span></span>/10</output></div>
+  <div class="ef-meta"><span class="ef-key">Vento</span><output class="ef-value"><span class="ef-roll" id="wind"><span>Sinistra</span></span></output></div>
+</div>
+<script>
+var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function swap(roll, text, axis, dir) {
+  var cur = roll.lastElementChild, nx = document.createElement('span');
+  nx.textContent = text;
+  if (reduce || !dir) { roll.replaceChildren(nx); return; }
+  roll.appendChild(nx);
+  var T = axis === 'y' ? 'translateY' : 'translateX', d = axis === 'y' ? 100 : 60, out = (axis === 'y' ? -dir : dir) * d;
+  var o = { duration: 180, easing: getComputedStyle(document.documentElement).getPropertyValue('--ease-drawer').trim() || 'ease' };
+  cur.animate([{ transform: T + '(0)', opacity: 1 }, { transform: T + '(' + out + '%)', opacity: 0 }], Object.assign({ fill: 'forwards' }, o)).onfinish = function () { cur.remove(); };
+  nx.animate([{ transform: T + '(' + (-out) + '%)', opacity: 0 }, { transform: T + '(0)', opacity: 1 }], o);
+}
+var lv = 7, ld = 1, w = -1, wd = 1, names = { '-1': 'Sinistra', '0': 'Fermo', '1': 'Destra' };
+setInterval(function () {
+  if (lv >= 10) ld = -1; if (lv <= 1) ld = 1; lv += ld; swap(document.getElementById('num'), lv, 'y', ld);
+  if (w >= 1) wd = -1; if (w <= -1) wd = 1; w += wd; swap(document.getElementById('wind'), names[w], 'x', wd);
+}, 1100);
+</script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+<!-- @dsCard group="Superfici" height=270 width=375 subtitle="Pannello dei controlli, telefono 375px" -->
+<!doctype html>
+<html lang="it">
+<head><meta charset="utf-8"><title>ControlPanel</title>
+<style>
+html, body { margin: 0; }
+body { background: var(--panel); padding: 16px; }
+body { padding: 0; background: var(--stage); } .ef-panel { max-width: 375px; }
+</style>
+</head>
+<body class="ef">
+<nav class="ef-panel" aria-label="Controlli del fuoco"><div class="ef-panel-inner">
+  <div class="ef-row"><div class="ef-meta"><span class="ef-key">Vento</span><output class="ef-value">Sinistra</output></div>
+    <div class="ef-wind" role="radiogroup" aria-label="Vento"><button class="ef-btn ef-btn-2" role="radio" aria-checked="true" type="button" aria-label="Verso sinistra"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button><button class="ef-btn ef-btn-2" role="radio" aria-checked="false" type="button" aria-label="Fermo, fiamme dritte"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button><button class="ef-btn ef-btn-2" role="radio" aria-checked="false" type="button" aria-label="Verso destra"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div></div>
+  <div class="ef-row"><div class="ef-meta"><span class="ef-key">Intensità</span><output class="ef-value">7/10</output></div><input class="ef-slider is-flame" type="range" min="1" max="10" step="1" value="7" aria-label="Intensità" style="--pct:66.7%"></div>
+  <div class="ef-actions"><button class="ef-btn ef-primary" type="button" aria-pressed="true">Spegni il fuoco</button><button class="ef-btn ef-btn-2" type="button" aria-label="Impostazioni"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button></div>
+</div></nav>
+
+</body>
+</html>

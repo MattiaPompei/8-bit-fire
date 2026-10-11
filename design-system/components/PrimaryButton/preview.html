@@ -1,0 +1,19 @@
+<!-- @dsCard group="Azioni" height=340 subtitle="Pulsante primario: splash e pannello, riposo, hover, premuto" -->
+<!doctype html>
+<html lang="it">
+<head><meta charset="utf-8"><title>PrimaryButton</title>
+<style>
+html, body { margin: 0; }
+body { background: var(--panel); padding: 24px; }
+.stack { display: grid; gap: 16px; max-width: 432px; } .cap { color: var(--label); font-size: 12px; margin-bottom: 8px; }
+</style>
+</head>
+<body class="ef">
+<div class="stack">
+  <div><div class="cap">Splash</div><button class="ef-btn ef-primary" type="button">Accendi il fuoco</button></div>
+  <div><div class="cap">Pannello a fuoco acceso (neutro), con il pulsante impostazioni</div><div class="ef-actions"><button class="ef-btn ef-primary is-on" type="button">Spegni il fuoco</button><button class="ef-btn ef-btn-2" type="button" aria-label="Impostazioni"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button></div></div>
+  <div><div class="cap">Pannello a fuoco spento</div><button class="ef-btn ef-primary" type="button">Accendi il fuoco</button></div>
+  <div><div class="cap">Hover e premuto</div><div class="ef-actions" style="grid-template-columns: 1fr 1fr"><button class="ef-btn ef-primary is-hover" type="button" tabindex="-1">Hover</button><button class="ef-btn ef-primary is-active" type="button" tabindex="-1">Premuto</button></div></div>
+</div>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!-- @dsCard height=288 -->
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>8-bit fire</title>
+<style>
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); overflow: hidden; }
+  .cover { position: relative; height: 288px; overflow: hidden; }
+  .band { position: absolute; top: 0; left: 0; width: 960px; height: 112px; }
+  .band svg { display: block; width: 960px; height: 112px; }
+  .accent { fill: var(--accent); }
+  .y { fill: var(--fire-24); }
+  .cream { fill: var(--focus); }
+  .ember { fill: var(--fire-08); }
+  .ground { fill: var(--bg); }
+  .words { position: absolute; left: var(--space-32); bottom: var(--space-32); max-width: 440px; }
+  .name { margin: 0; font-family: var(--font-pixel); font-weight: 700; font-size: 64px; line-height: .95; color: var(--fg); white-space: nowrap; }
+  .tag { margin: var(--space-8) 0 0; font-size: 14px; line-height: 20px; color: var(--label); }
+</style>
+</head>
+<body>
+<div class="cover">
+<div class="band" aria-hidden="true">
+<svg viewBox="0 0 960 112" width="960" height="112">
+<!--
+  blocks      accent 336x88 (il colore del brand, il blocco più grande) · fire-24 208x88 (il giallo del fuoco) · focus 128x88 (la crema del titolo) · fire-08 224x88 che esce dal bordo destro (la brace) — circa il 37% di 960x288
+  arrangement striscia di bande diseguali in alto (il prodotto compone in fasce orizzontali: fuoco sopra, pannello sotto); il nome è troppo largo per la zona a destra, quindi schema a fascia superiore
+  pattern     quadrati di fondo tagliati dalla cima dei blocchi a passo space-16 come lingue di fiamma, più sei scintille staccate: il motivo letterale del prodotto, il fuoco fatto di celle
+  scales      lati e passo in multipli di space-16; gutter space-16; margini space-32 (multipli di 8); angoli vivi come le celle del fuoco
+-->
+<rect class="accent" x="32" y="24" width="336" height="88"/>
+<rect class="y" x="384" y="24" width="208" height="88"/>
+<rect class="cream" x="608" y="24" width="128" height="88"/>
+<rect class="ember" x="752" y="24" width="224" height="88"/>
+<rect class="ground" x="32" y="24" width="16" height="16"/>
+<rect class="ground" x="32" y="40" width="16" height="16"/>
+<rect class="ground" x="48" y="24" width="16" height="16"/>
+<rect class="ground" x="80" y="24" width="16" height="16"/>
+<rect class="ground" x="96" y="24" width="16" height="16"/>
+<rect class="ground" x="112" y="24" width="16" height="16"/>
+<rect class="ground" x="112" y="40" width="16" height="16"/>
+<rect class="ground" x="128" y="24" width="16" height="16"/>
+<rect class="ground" x="176" y="24" width="16" height="16"/>
+<rect class="ground" x="192" y="24" width="16" height="16"/>
+<rect class="ground" x="208" y="24" width="16" height="16"/>
+<rect class="ground" x="240" y="24" width="16" height="16"/>
+<rect class="ground" x="256" y="24" width="16" height="16"/>
+<rect class="ground" x="256" y="40" width="16" height="16"/>
+<rect class="ground" x="272" y="24" width="16" height="16"/>
+<rect class="ground" x="288" y="24" width="16" height="16"/>
+<rect class="ground" x="320" y="24" width="16" height="16"/>
+<rect class="ground" x="336" y="24" width="16" height="16"/>
+<rect class="ground" x="336" y="40" width="16" height="16"/>
+<rect class="ground" x="352" y="24" width="16" height="16"/>
+<rect class="ground" x="384" y="24" width="16" height="16"/>
+<rect class="ground" x="416" y="24" width="16" height="16"/>
+<rect class="ground" x="432" y="24" width="16" height="16"/>
+<rect class="ground" x="432" y="40" width="16" height="16"/>
+<rect class="ground" x="448" y="24" width="16" height="16"/>
+<rect class="ground" x="464" y="24" width="16" height="16"/>
+<rect class="ground" x="512" y="24" width="16" height="16"/>
+<rect class="ground" x="528" y="24" width="16" height="16"/>
+<rect class="ground" x="528" y="40" width="16" height="16"/>
+<rect class="ground" x="544" y="24" width="16" height="16"/>
+<rect class="ground" x="576" y="24" width="16" height="16"/>
+<rect class="ground" x="608" y="24" width="16" height="16"/>
+<rect class="ground" x="624" y="24" width="16" height="16"/>
+<rect class="ground" x="656" y="24" width="16" height="16"/>
+<rect class="ground" x="672" y="24" width="16" height="16"/>
+<rect class="ground" x="672" y="40" width="16" height="16"/>
+<rect class="ground" x="688" y="24" width="16" height="16"/>
+<rect class="ground" x="720" y="24" width="16" height="16"/>
+<rect class="ground" x="768" y="24" width="16" height="16"/>
+<rect class="ground" x="784" y="24" width="16" height="16"/>
+<rect class="ground" x="800" y="24" width="16" height="16"/>
+<rect class="ground" x="832" y="24" width="16" height="16"/>
+<rect class="ground" x="848" y="24" width="16" height="16"/>
+<rect class="ground" x="848" y="40" width="16" height="16"/>
+<rect class="ground" x="864" y="24" width="16" height="16"/>
+<rect class="ground" x="880" y="24" width="16" height="16"/>
+<rect class="ground" x="912" y="24" width="16" height="16"/>
+<rect class="ground" x="928" y="24" width="16" height="16"/>
+<rect class="ground" x="928" y="40" width="16" height="16"/>
+<rect class="ground" x="944" y="24" width="16" height="16"/>
+<rect class="accent" x="112" y="0" width="16" height="16"/>
+<rect class="accent" x="272" y="0" width="16" height="16"/>
+<rect class="y" x="448" y="0" width="16" height="16"/>
+<rect class="y" x="528" y="0" width="16" height="16"/>
+<rect class="cream" x="656" y="0" width="16" height="16"/>
+<rect class="ember" x="832" y="0" width="16" height="16"/>
+</svg>
+</div>
+<div class="words">
+<h1 class="name">8-bit fire</h1>
+<p class="tag">Un fuoco in pixel da tenere acceso sul telefono.</p>
+</div>
+</div>
+</body>
+</html>

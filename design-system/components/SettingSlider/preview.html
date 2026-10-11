@@ -1,0 +1,19 @@
+<!-- @dsCard group="Controlli" height=210 subtitle="Altezza, Celle, Velocità" -->
+<!doctype html>
+<html lang="it">
+<head><meta charset="utf-8"><title>SettingSlider</title>
+<style>
+html, body { margin: 0; }
+body { background: var(--panel); padding: 16px; }
+.stack { display: grid; gap: 16px; max-width: 448px; }
+</style>
+</head>
+<body class="ef">
+<div class="stack">
+  <div class="ef-row"><div class="ef-meta"><span class="ef-key">Altezza</span><output class="ef-value">100%</output></div><input class="ef-slider" type="range" min="10" max="100" step="5" value="100" aria-label="Altezza" style="--pct:100%"></div>
+  <div class="ef-row"><div class="ef-meta"><span class="ef-key">Celle</span><output class="ef-value">8 px</output></div><input class="ef-slider" type="range" min="0" max="5" step="1" value="1" aria-label="Celle" style="--pct:20%"></div>
+  <div class="ef-row"><div class="ef-meta"><span class="ef-key">Velocità</span><output class="ef-value">20 fps</output></div><input class="ef-slider" type="range" min="20" max="60" step="5" value="20" aria-label="Velocità" style="--pct:0%"></div>
+</div>
+
+</body>
+</html>
