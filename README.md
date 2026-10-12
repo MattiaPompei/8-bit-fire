@@ -38,18 +38,19 @@ L'audio sono due registrazioni in loop, mixate in dissolvenza secondo l'intensit
 
 | Percorso | Contenuto |
 |---|---|
-| `2026-10-11_8-bit-fire_App_v02.html` | versione attuale dell'app (file sorgente) |
-| `2026-10-11_8-bit-fire_App_v01.html` | versione precedente |
-| `docs/play.html` | l'app per GitHub Pages, generata da `tools/build_pages.py` |
+| `src/app.html` | sorgente dell'app (l'audio è un segnaposto, si modifica solo questo file) |
+| `*_App_vNN.html` | versioni salvate con `tools/build.py --snapshot` |
+| `docs/play.html` | l'app per GitHub Pages, generata da `tools/build.py` |
 | `docs/manifest.webmanifest`, `docs/sw.js`, `docs/icons/` | PWA: manifest, service worker (offline), icone |
-| `tools/` | `build_pages.py` (genera `docs/play.html` e `docs/sw.js`), `make_icons.py` (icone pixel) |
+| `tools/` | `build.py` (inserisce l'audio e genera `dist/`, `docs/play.html`, `docs/sw.js`), `sync.sh` (build, commit e push), `make_icons.py` (icone pixel) |
+| `CLAUDE.md` | istruzioni di progetto per Claude Code |
 | `docs/index.html` | pagina con tutte le informazioni sul progetto |
 | `design-system/` | token, brand book, sezioni (fuoco, interazioni, animazioni, audio), componenti con anteprime, icone SVG |
 | `audio/` | registrazioni originali (mp3), versioni AAC incorporate nell'app (m4a), audio muto per iPhone |
 | `*_Design-critique_v01.md` | critica di design |
 | `*_Accessibility-review_v01.md` | audit WCAG 2.1 AA |
 
-I file seguono la convenzione `AAAA-MM-GG_Progetto_Descrizione_vNN`. Dopo ogni nuova versione dell'app lancia `python3 tools/build_pages.py`: rigenera `docs/play.html` dalla versione più recente e aggiorna la cache del service worker, così i telefoni ricevono l'aggiornamento.
+I file seguono la convenzione `AAAA-MM-GG_Progetto_Descrizione_vNN`. Dopo ogni modifica a `src/app.html` lancia `tools/sync.sh "messaggio"`: ricostruisce l'app con l'audio, rigenera `docs/play.html`, aggiorna la cache del service worker (così i telefoni ricevono l'aggiornamento), poi fa commit e push.
 
 ## Design system in breve
 

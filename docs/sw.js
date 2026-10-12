@@ -1,7 +1,7 @@
 // Service worker di 8-bit fire: l'app funziona anche offline dopo la prima apertura.
 // Pagine: prima la rete (così gli aggiornamenti arrivano), poi la cache. Icone e manifest: prima la cache.
-// Font di Google: cache con aggiornamento in background. Versione generata da tools/build_pages.py.
-const CACHE = '8bit-fire-586fe03516';
+// Font di Google: cache con aggiornamento in background. Versione generata da tools/build.py.
+const CACHE = '8bit-fire-9de1f3a441';
 const CORE = ['./', 'index.html', 'play.html', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png', 'icons/favicon-32.png'];
 

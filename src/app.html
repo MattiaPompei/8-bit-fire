@@ -1,0 +1,1351 @@
+<title>8-bit fire</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Silkscreen:wght@700&display=swap">
+<style>
+/* Layout: colonna a tutta viewport. Fuoco in alto (flex:1), pannello in basso alto quanto il suo contenuto.
+   Una riga per controllo, dal meno al più importante scendendo: vento, intensità, accensione + impostazioni.
+   Altezza, celle e velocità stanno in un foglio modale che sale dal basso.
+   Tap area minima 44px, 16px tra tap area diverse, raggio unico 8px. Tema unico scuro, voluto. */
+:root {
+  --bg: #0c0a09;
+  --panel: #141210;
+  --raise: #1e1b18;
+  --btn: #2c2723;          /* secondario a riposo: più chiaro del pannello (#141210) */
+  --btn-hover: #332d28;
+  --btn-press: #1d1a17;
+  --power: #3a332d;       /* primario a fuoco acceso */    /* premuto: scende sotto il riposo, come un tasto che affonda */
+  --btn-ring: rgba(244, 241, 236, 0.6);
+  --btn-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);        /* entrate, uscite, pressioni */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);     /* foglio impostazioni (curva da drawer iOS) */
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);    /* movimenti sullo schermo (ritorno del fuoco) */
+  --line: rgba(255, 255, 255, 0.08);
+  --track: rgba(255, 255, 255, 0.14);
+  --fg: #f4f1ec;
+  --muted: #a39d96;
+  --label: #c4bcb2;
+  --accent: #e2561a;
+  --accent-soft: rgba(226, 86, 26, 0.16);
+  --accent-fg: #ff9a66;
+  --ink: #1a0a02;
+  --focus: #ffd9a8;
+  --radius: 8px;
+  /* Griglia di 8px: ogni spazio, padding e misura dei controlli è un multiplo di 8 */
+  --tap: 48px;            /* tap area minima: 6 x 8 */
+  --gap: 16px;            /* tra elementi e tra tap area: 2 x 8 */
+  --edge: 24px;           /* margine esterno uniforme, laterale e inferiore, in splash e pagina: 3 x 8 */
+  --primary-h: 56px;      /* pulsanti primari: 7 x 8 */
+  --font-ui: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+html { box-sizing: border-box; }
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; overflow: hidden; overscroll-behavior: none; background: var(--bg); color: var(--fg); }
+body {
+  font-family: var(--font-ui); font-size: 14px; line-height: 1.3;
+  -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+.app { height: 100%; display: flex; flex-direction: column; }
+.stage { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; background: rgb(7, 7, 7); }
+/* Il fuoco si muove con due variabili: --lift-fire (sale con il foglio impostazioni) e --zoom-fire
+   (75% con le impostazioni aperte, 108% prima della partenza). Origine in basso al centro: la base resta appoggiata.
+   Durata e curva cambiano con il gesto: apertura lunga che decelera, chiusura più breve e simmetrica. */
+#fire {
+  position: absolute; left: 0; bottom: 0; image-rendering: pixelated; image-rendering: crisp-edges;
+  transform-origin: 50% 100%;
+  transform: translateY(var(--lift-fire, 0px)) scale(var(--zoom-fire, 1));
+}
+body:not(.started) #fire { --zoom-fire: 1.08; }
+@media (prefers-reduced-motion: no-preference) {
+  #fire { transition: transform var(--fire-dur, 600ms) var(--fire-ease, var(--ease-out)); }   /* will-change solo durante il movimento (JS) */
+}
+
+.ui { flex: none; padding-block: var(--edge); padding-inline: var(--edge); background: var(--panel); border-top: 1px solid var(--line); }
+.ui-inner { max-width: 480px; margin: 0 auto; display: grid; gap: var(--gap); }
+
+.row { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: var(--gap); align-items: center; min-height: var(--tap); }
+/* Chiave 12px e valore 16px: rapporto 4:3. Chiave chiara (#c4bcb2, ~10:1 sul pannello), valore pieno */
+.meta { display: grid; gap: 8px; min-width: 0; }
+.meta .k { color: var(--label); font-size: 12px; line-height: 1.2; letter-spacing: 0.02em; }
+.meta output { color: var(--fg); font-size: 16px; font-weight: 500; line-height: 1.2; font-variant-numeric: tabular-nums; }
+
+button {
+  font: 500 14px/1 var(--font-ui); color: var(--fg);
+  min-height: var(--tap); padding: 0 16px;
+  background: var(--raise); border: 1px solid var(--line); border-radius: var(--radius);
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  cursor: pointer; touch-action: manipulation;
+}
+button:disabled { opacity: 0.35; cursor: default; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) { button:not(:disabled):hover { border-color: rgba(255, 255, 255, 0.22); } }
+@media (prefers-reduced-motion: no-preference) {
+  button { transition: background-color 150ms ease, border-color 150ms ease, transform 160ms var(--ease-out); }
+  button:not(:disabled):active { transform: scale(0.97); }
+}
+/* Icone: 24px su viewBox 24, tratto 2 = 2px reali, uguale per tutte */
+svg { display: block; width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Slider */
+input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: var(--tap); margin: 0; background: transparent; cursor: pointer;
+  --pct: 50%;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 2px;
+  background: linear-gradient(to right, var(--accent) var(--pct), var(--track) var(--pct));
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 24px; height: 24px; margin-top: -10px;
+  border: 0; border-radius: var(--radius); background: var(--fg);
+}
+input[type="range"]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--track); }
+input[type="range"]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--accent); }
+input[type="range"]::-moz-range-thumb { width: 24px; height: 24px; border: 0; border-radius: var(--radius); background: var(--fg); }
+
+/* Vento */
+.wind { display: grid; grid-template-columns: repeat(3, minmax(var(--tap), 1fr)); gap: var(--gap); }
+.wind button { padding: 0; }
+
+/* Pulsanti secondari (vento, impostazioni, audio, schermo intero, chiudi)
+   riposo: superficie piena più chiara del pannello, nessun bordo
+   hover: contorno 1.5px chiaro (l'unico stato che usa un contorno) e superficie un filo più chiara
+   premuto: superficie più scura del riposo e scala 0.96, l'icona affonda
+   selezionato: barra di 6px nel colore del fuoco sul fondo del pulsante
+   disattivato: 40% di opacità, la barra del selezionato diventa grigia */
+.btn-2 { background: var(--btn); border: 0; box-shadow: none; }
+.btn-2 { transition: background-color 160ms ease, opacity 200ms ease; }   /* la barra (box-shadow) cambia senza transizione */
+@media (prefers-reduced-motion: no-preference) {
+  .btn-2 { transition: background-color 160ms ease, transform 160ms var(--ease-out), opacity 200ms ease; }
+  .btn-2 svg { transition: transform 160ms var(--ease-out); }
+}
+@media (hover: hover) and (pointer: fine) {
+  .btn-2:not(:disabled):hover { background: var(--btn-hover); box-shadow: inset 0 0 0 1.5px var(--btn-ring); }
+  .btn-2[aria-checked="true"]:not(:disabled):hover { box-shadow: inset 0 -6px 0 var(--accent), inset 0 0 0 1.5px var(--btn-ring); }
+}
+.btn-2:not(:disabled):active { background: var(--btn-press); transform: scale(0.97); }
+.btn-2:not(:disabled):active svg { transform: translateY(1px); }
+.btn-2[aria-checked="true"] { box-shadow: inset 0 -6px 0 var(--accent); }
+.btn-2:disabled { opacity: 0.4; }
+.btn-2[aria-checked="true"]:disabled { box-shadow: inset 0 -6px 0 var(--muted); }
+
+/* Intensità: la parte piena dello slider ha i colori del fuoco */
+#level::-webkit-slider-runnable-track {
+  background:
+    linear-gradient(to right, transparent var(--pct), var(--track) var(--pct)),
+    linear-gradient(to right, rgb(143, 39, 7), rgb(223, 87, 7), rgb(207, 135, 23), rgb(239, 239, 199));
+}
+#level::-moz-range-progress { background: linear-gradient(to right, rgb(143, 39, 7), rgb(223, 87, 7), rgb(207, 135, 23)); }
+/* Cursore a forma di fiamma bianca, con uno stacco di 2px color pannello che la separa dalla barra.
+   Alzato di 10px perché il peso visivo della fiamma sta in basso. */
+#level::-webkit-slider-thumb {
+  width: 35px; height: 45px; margin-top: -30px; border-radius: 0;
+  background: var(--flame) center / contain no-repeat;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+}
+#level::-moz-range-thumb {
+  width: 35px; height: 45px; border-radius: 0; transform: translateY(-10px);
+  background: var(--flame) center / contain no-repeat;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+}
+
+/* Trascinamento sul fuoco */
+.stage { touch-action: none; cursor: ns-resize; }
+.hud {
+  position: absolute; bottom: 32px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: baseline; gap: 8px; padding: 8px 16px; white-space: nowrap;
+  border: 1px solid rgba(255, 255, 255, 0.12); border-radius: var(--radius);
+  background: rgba(20, 18, 16, 0.88); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);   /* 88%: leggibile anche sulla base bianca */
+  color: var(--label); font-size: 12px; pointer-events: none; opacity: 0;
+}
+.hud b { color: var(--fg); font-size: 16px; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+/* Micro-animazioni dei valori: il vecchio testo esce e il nuovo entra nella stessa cella.
+   .v = rotazione verticale (cifre dell'intensità), ritagliata sull'altezza della riga.
+   senza .v = spostamento laterale nel verso del vento, senza ritaglio. */
+.roll { display: inline-grid; vertical-align: bottom; }
+.roll > span { grid-area: 1 / 1; white-space: nowrap; }
+.roll.v { overflow: hidden; }
+.hud.show { opacity: 1; }
+.hud { transition: opacity 200ms ease; }   /* solo opacità: vale anche con movimento ridotto */
+@media (prefers-reduced-transparency: reduce) { .hud { background: var(--raise); -webkit-backdrop-filter: none; backdrop-filter: none; } }
+
+/* Accensione + impostazioni */
+.actions { display: grid; grid-template-columns: minmax(0, 1fr) var(--primary-h); gap: var(--gap); }
+/* Pulsante primario, uguale nella splash ("Accendi il fuoco") e nella pagina (accensione) */
+.primary {
+  width: 100%; min-height: var(--primary-h); padding: 0 var(--edge);
+  font-size: 16px; font-weight: 600; background: var(--accent); border-color: var(--accent); color: var(--ink);
+}
+@media (hover: hover) and (pointer: fine) { .primary:not(:disabled):hover { background: #ef6a2c; border-color: #ef6a2c; } }
+/* A fuoco acceso il primario resta uguale per forma e misure ma con fondo neutro: l'accento invita solo ad accendere */
+.primary.is-on { background: var(--power); border-color: var(--track); color: var(--fg); }
+@media (hover: hover) and (pointer: fine) { .primary.is-on:not(:disabled):hover { background: #443c35; border-color: rgba(255, 255, 255, 0.22); } }
+button.icon { padding: 0; min-width: var(--tap); }
+.actions button.icon { min-height: var(--primary-h); }
+
+/* Audio e schermo intero: in alto a destra sopra il fuoco */
+.corner { position: absolute; top: var(--edge); right: var(--edge); display: flex; gap: var(--gap); }
+.corner .exit { padding: 0 var(--gap); min-width: var(--tap); }
+/* Schermo intero: niente pannello, niente margini di sicurezza, il fuoco parte dal fondo dello schermo */
+html.immersive { padding-top: 0; padding-bottom: 0; }
+html.immersive .corner { top: calc(var(--edge) + env(safe-area-inset-top, 0px)); right: calc(var(--edge) + env(safe-area-inset-right, 0px)); }
+/* Esci in alto a sinistra, separato da audio e schermo intero */
+.corner.left { right: auto; left: var(--edge); }
+html.immersive .corner.left { right: auto; left: calc(var(--edge) + env(safe-area-inset-left, 0px)); }
+.glass {
+  background: rgba(44, 39, 35, 0.82);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+@media (hover: hover) and (pointer: fine) { .glass.btn-2:not(:disabled):hover { background: rgba(51, 45, 40, 0.9); } }
+.glass.btn-2:not(:disabled):active { background: rgba(29, 26, 23, 0.9); }
+.glass[aria-pressed="false"] .on, .glass[aria-pressed="true"] .off { display: none; }
+.glass[aria-pressed="true"] { color: var(--accent-fg); }
+@media (prefers-reduced-transparency: reduce) { .glass { background: var(--btn); -webkit-backdrop-filter: none; backdrop-filter: none; } }
+
+/* Modale impostazioni: foglio che sale dal basso */
+.sheet {
+  margin: auto auto 0; width: 100%; max-width: 512px; max-height: 100%; overflow-y: auto; overscroll-behavior: contain;
+  padding-block: var(--edge) calc(var(--edge) + env(safe-area-inset-bottom, 0px));
+  padding-inline: var(--edge);
+  border: 1px solid var(--line); border-bottom: 0; border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--panel); color: var(--fg);
+}
+.sheet::backdrop { background: rgba(0, 0, 0, 0.2); }   /* leggero: il fuoco resta visibile mentre si regolano le impostazioni */
+.sheet-inner { display: grid; gap: var(--gap); }
+.reset { width: 100%; }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); }
+.sheet-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
+/* Transizioni, non keyframes: aprire durante la chiusura (o viceversa) riparte da dove si trova.
+   .closing è lo stato "fuori": il JS lo mette prima di showModal e lo toglie per far salire il foglio.
+   Apertura 500ms con la curva da drawer; chiusura 300ms che parte subito (ease-out, mai ease-in). */
+.sheet::backdrop { opacity: 1; }
+.sheet.closing::backdrop { opacity: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .sheet { transform: translateY(0); transition: transform 500ms var(--ease-drawer); }
+  .sheet::backdrop { transition: opacity 500ms var(--ease-drawer); }
+  .sheet.closing { transform: translateY(100%); transition: transform 300ms var(--ease-out); }
+  .sheet.closing::backdrop { transition: opacity 300ms var(--ease-out); }
+}
+/* Desktop: il foglio impostazioni è un pannello laterale che entra e esce da destra, a tutta altezza */
+@media (min-width: 768px) {
+  .sheet:not(.page) {
+    margin: 0 0 0 auto; width: 400px; max-width: 400px; height: 100%; max-height: 100%;
+    padding-block: calc(var(--edge) + env(safe-area-inset-top, 0px)) calc(var(--edge) + env(safe-area-inset-bottom, 0px));
+    padding-inline: var(--edge) calc(var(--edge) + env(safe-area-inset-right, 0px));
+    border: 0; border-left: 1px solid var(--line); border-radius: 0;
+  }
+}
+@media (min-width: 768px) and (prefers-reduced-motion: no-preference) {
+  .sheet:not(.page) { transform: translateX(0); }
+  .sheet:not(.page).closing { transform: translateX(100%); }
+  /* con i Controlli aperti dentro il pannello, il contenuto delle impostazioni scivola a sinistra e si attenua */
+  #settings > .sheet-inner { transition: transform 500ms var(--ease-drawer), opacity 500ms var(--ease-drawer); }
+  #settings.pushed > .sheet-inner { transform: translateX(-30%); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* movimento ridotto: solo dissolvenza */
+  .sheet { opacity: 1; transition: opacity 180ms ease-out; }
+  .sheet::backdrop { transition: opacity 180ms ease-out; }
+  .sheet.closing { opacity: 0; }
+}
+
+/* ---- Splash ----
+   Il fuoco con le impostazioni predefinite gira in un loop di 2 secondi sotto un velo nero al 50%.
+   Uscita: titolo e pulsante salgono e svaniscono, il velo e il loop sfumano sul fuoco vero,
+   il pannello sale dal basso e il fuoco si assesta dal 108% al 100%. */
+.splash {
+  position: fixed; inset: 0; z-index: 10; background: rgb(7, 7, 7);
+  display: grid; grid-template-rows: 1fr auto; grid-template-columns: minmax(0, 1fr); justify-items: center;
+}
+.splash canvas { position: absolute; left: 0; bottom: 0; image-rendering: pixelated; image-rendering: crisp-edges; }
+.splash-veil { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.5); }
+/* Titolo e pulsante sono figli diretti della splash: titolo al centro della prima riga, pulsante in fondo */
+.splash-content { display: contents; }
+/* Titolo pixel a due toni, come un'insegna arcade: parte alta crema (--focus), fascia bassa arancio (--accent),
+   contorno di 1 "pixel" (1/16 em) e ombra a gradino in basso a destra nel colore del fondo (--bg).
+   Due toni con background-clip, contorno e ombra con drop-shadow a raggio 0 (text-shadow coprirebbe il gradiente). */
+.splash-title {
+  position: relative; align-self: start; margin: 0; padding-inline: var(--edge);
+  margin-top: calc(100vh / 3 - 0.5em); margin-top: calc(100dvh / 3 - 0.5em);   /* centro del titolo a 1/3 dell'altezza */
+  font-family: "Silkscreen", "Courier New", monospace; font-weight: 700;
+  font-size: clamp(21px, 9.375vw, 60px); line-height: 1;   /* -25% rispetto a 12.5vw / 80px; il titolo misura circa 7em */ text-transform: uppercase; white-space: nowrap;
+  background: linear-gradient(to bottom, var(--focus) 0 63%, var(--accent) 63% 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter:
+    drop-shadow(0.0625em 0 0 var(--bg)) drop-shadow(-0.0625em 0 0 var(--bg))
+    drop-shadow(0 0.0625em 0 var(--bg)) drop-shadow(0 -0.0625em 0 var(--bg))
+    drop-shadow(0.0625em 0.0625em 0 var(--bg)) drop-shadow(0.0625em 0.0625em 0 var(--bg));
+}
+/* Pulsante primario in fondo allo schermo, nella zona del pollice */
+/* Nella splash il primario sta in fondo con gli stessi margini del pannello: --edge ai lati e sotto, largo fino a 480px */
+.splash-actions {
+  position: relative; display: grid; gap: var(--gap); width: min(100% - 2 * var(--edge), 480px);
+  margin-bottom: calc(var(--edge) + env(safe-area-inset-bottom, 0px));
+}
+.splash-actions button { width: 100%; }
+/* Controlli nella splash: pulsante "i" in alto a destra, come i pulsanti sopra il fuoco */
+.splash-info { position: absolute; top: calc(var(--edge) + env(safe-area-inset-top, 0px)); right: calc(var(--edge) + env(safe-area-inset-right, 0px)); }
+/* Partenza: due durate soltanto, 600ms per le superfici grandi e 400ms per i dettagli, tutte con --ease-out.
+   Il ritardo vale solo uscendo dalla splash (lascia salire titolo e CTA); tornando con Esci la splash sfuma subito. */
+@media (prefers-reduced-motion: no-preference) {
+  .splash-content > * { animation: rise-in 500ms var(--ease-out) both; }
+  .splash-content > :nth-child(2) { animation-delay: 60ms; }
+  .splash.leaving .splash-content > * { animation: rise-out 240ms var(--ease-out) forwards; }
+  .splash.leaving .splash-content > :nth-child(2) { animation-delay: 40ms; }
+  .splash { transition: opacity 400ms var(--ease-out); }
+  .splash.leaving { transition: opacity 600ms var(--ease-out) 160ms; }
+  .ui { transition: transform 600ms var(--ease-out) 200ms; }
+  .corner { transition: opacity 400ms var(--ease-out) 400ms; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .splash { transition: opacity 200ms ease-out; }
+  .corner { transition: opacity 200ms ease-out; }
+}
+.splash.leaving { opacity: 0; pointer-events: none; }
+body:not(.started) .ui { transform: translateY(100%); }
+body:not(.started) .corner { opacity: 0; }
+@keyframes rise-in { from { opacity: 0; transform: translateY(16px); } }
+@keyframes rise-out { to { opacity: 0; transform: translateY(-20px); } }
+
+body.ui-hidden { cursor: none; }
+
+/* Focus sopra il fuoco: anello chiaro con alone scuro, visibile anche sulla base bianca */
+.glass:focus-visible { box-shadow: 0 0 0 6px var(--bg); }
+/* Secondario di testo (Esci, Controlli, Tastiera) */
+.btn-2.txt { padding: 0 var(--gap); min-width: var(--tap); font-size: 14px; }
+.seg2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap); }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* ---- Pagina Controlli ----
+   Foglio a tutta altezza con la stessa meccanica del foglio impostazioni (sale dal basso, .closing = fuori).
+   Testata fissa, corpo che scorre. Ogni gesto ha una piccola dimostrazione animata: un dito sopra un
+   fuoco in miniatura nella palette del fuoco. Le dimostrazioni girano solo a pagina aperta e si fermano
+   con il movimento ridotto. */
+.sheet.page {
+  margin: 0 0 0 auto; width: 100%; max-width: 100%; height: 100%; max-height: 100%; overflow: hidden; padding: 0;
+  border: 0; border-radius: 0; display: none;
+}
+.sheet.page[open] { display: flex; flex-direction: column; }
+.sheet.page::backdrop { background: rgba(0, 0, 0, 0.6); }
+/* aperta dalle impostazioni: vive "dentro" il pannello, che resta il suo sfondo */
+.sheet.page.nested::backdrop { background: transparent; }
+@media (min-width: 768px) {
+  .sheet.page { width: 400px; max-width: 400px; border-left: 1px solid var(--line); }
+  .sheet.page.nested { border-left-color: transparent; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sheet.page { transform: translateX(0); }
+  .sheet.page.closing { transform: translateX(100%); }
+}
+/* testata: Indietro quando è annidata nelle impostazioni, Chiudi altrimenti */
+.page-head .back { display: none; }
+.sheet.page.nested .page-head .back { display: flex; }
+.sheet.page.nested .page-head .close { display: none; }
+.page-head .title { display: flex; align-items: center; gap: var(--gap); min-width: 0; }
+.page-head {
+  flex: none; display: flex; align-items: center; justify-content: space-between; gap: var(--gap);
+  padding-block: calc(var(--edge) + env(safe-area-inset-top, 0px)) var(--gap); padding-inline: var(--edge);
+  border-bottom: 1px solid var(--line);
+}
+.page-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.page-body {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding-block: var(--edge) calc(var(--edge) * 2 + env(safe-area-inset-bottom, 0px)); padding-inline: var(--edge);
+  display: grid; gap: 32px; align-content: start;
+}
+.page-intro { margin: 0; color: var(--label); font-size: 14px; line-height: 1.5; max-width: 40ch; }
+.ctl-group { display: grid; gap: var(--gap); }
+.ctl-group h3 { margin: 0; color: var(--label); font-size: 12px; font-weight: 500; letter-spacing: 0.02em; }
+.ctl-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--edge); }
+.ctl { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: var(--gap); align-items: start; }
+.ctl-text { display: grid; gap: 8px; padding-top: 4px; min-width: 0; }
+.ctl-text b { font-size: 16px; font-weight: 500; color: var(--fg); line-height: 1.2; }
+.ctl-text span { font-size: 14px; color: var(--label); line-height: 1.5; }
+/* Riquadro dell'esempio: 64px, fondo del fuoco o del pulsante, icone del sistema */
+.ctl-ico {
+  width: 64px; height: 64px; border-radius: var(--radius); background: var(--btn);
+  display: flex; align-items: center; justify-content: center; gap: 4px; color: var(--fg);
+}
+.ctl-ico svg { width: 24px; height: 24px; }
+.ctl-ico .mini-primary { width: 48px; height: 24px; border-radius: 6px; background: var(--accent); }
+.ctl-ico .mini-primary.on { background: var(--power); box-shadow: inset 0 0 0 1px var(--track); }
+.ctl-ico .mini-flame { width: 28px; height: 36px; background: var(--flame-icon) center / contain no-repeat; }
+.ctl-ico.wide { gap: 2px; }
+.ctl-ico.wide svg { width: 18px; height: 18px; }
+.ctl-ico.txt { font-size: 14px; font-weight: 500; }
+/* Dimostrazione dei gesti */
+.demo { position: relative; width: 64px; height: 64px; border-radius: var(--radius); overflow: hidden; background: var(--stage); }
+.demo .fl {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 75%; transform-origin: 50% 100%;
+  background: linear-gradient(to top, rgb(239, 239, 199) 0%, rgb(199, 151, 31) 18%, rgb(223, 87, 7) 42%, rgb(143, 39, 7) 70%, rgb(7, 7, 7) 100%);
+}
+.demo::after {   /* griglia di pixel da 8px sopra il fuoco in miniatura */
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background:
+    repeating-linear-gradient(to right, rgba(7, 7, 7, 0.35) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(to bottom, rgba(7, 7, 7, 0.35) 0 1px, transparent 1px 8px);
+}
+.demo .finger {
+  position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; z-index: 1;
+  border-radius: 50%; background: var(--fg); box-shadow: 0 0 0 4px rgba(244, 241, 236, 0.28), 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+.demo .ring { position: absolute; left: 50%; top: 50%; width: 32px; height: 32px; margin: -16px 0 0 -16px; z-index: 1; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--fg); opacity: 0; }
+.demo.tap .fl { height: 60%; }
+.demo.off .fl { transform: scaleY(0.05); }
+@media (prefers-reduced-motion: no-preference) {
+  .page[open] .demo.tap .finger { animation: d-tap 1800ms var(--ease-out) infinite; }
+  .page[open] .demo.tap .ring { animation: d-ring 1800ms var(--ease-out) infinite; }
+  .page[open] .demo.v .finger { animation: d-v 2400ms var(--ease-in-out) infinite; }
+  .page[open] .demo.v .fl { animation: d-v-fl 2400ms var(--ease-in-out) infinite; }
+  .page[open] .demo.h .finger { animation: d-h 2400ms var(--ease-in-out) infinite; }
+  .page[open] .demo.h .fl { animation: d-h-fl 2400ms var(--ease-in-out) infinite; }
+  .page[open] .demo.off .finger { animation: d-up 2400ms var(--ease-in-out) infinite; }
+  .page[open] .demo.off .fl { animation: d-up-fl 2400ms var(--ease-in-out) infinite; }
+  /* entrata della pagina: i gruppi salgono di 16px e compaiono, 40ms l'uno dall'altro */
+  .page[open] .reveal { animation: rise-in 400ms var(--ease-out) both; animation-delay: calc(var(--i, 0) * 40ms); }
+}
+@keyframes d-tap { 0%, 30%, 100% { transform: scale(1); } 40% { transform: scale(0.8); } 52% { transform: scale(1); } 62% { transform: scale(0.8); } 74% { transform: scale(1); } }
+@keyframes d-ring { 0%, 36% { opacity: 0; transform: scale(0.5); } 42% { opacity: 0.8; } 60% { opacity: 0; transform: scale(1.4); } 100% { opacity: 0; } }
+@keyframes d-v { 0%, 100% { transform: translateY(14px); } 50% { transform: translateY(-14px); } }
+@keyframes d-v-fl { 0%, 100% { transform: scaleY(0.5); } 50% { transform: scaleY(1); } }
+@keyframes d-h { 0%, 100% { transform: translateX(-16px); } 50% { transform: translateX(16px); } }
+@keyframes d-h-fl { 0%, 100% { transform: skewX(14deg); } 50% { transform: skewX(-14deg); } }
+@keyframes d-up { 0% { transform: translateY(18px); opacity: 0; } 12% { opacity: 1; } 60% { transform: translateY(-14px); opacity: 1; } 80%, 100% { transform: translateY(-14px); opacity: 0; } }
+@keyframes d-up-fl { 0%, 10% { transform: scaleY(0.05); } 60%, 85% { transform: scaleY(0.7); } 100% { transform: scaleY(0.05); } }
+.kbd-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--gap); }
+.ctl-term { color: var(--fg); font-weight: 500; }
+.kbd-list li { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: var(--gap); align-items: center; font-size: 14px; color: var(--label); }
+.kbd-keys { display: flex; flex-wrap: wrap; gap: 8px; }
+kbd {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 32px; padding: 0 8px;
+  border-radius: var(--radius); background: var(--btn); color: var(--fg); font: 500 12px/1 var(--font-ui);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.35);
+}
+</style>
+
+<div class="splash" id="splash">
+  <canvas id="splashFire" aria-hidden="true"></canvas>
+  <div class="splash-veil"></div>
+  <button id="openControls" class="icon glass btn-2 splash-info" type="button" aria-label="Controlli" aria-haspopup="dialog"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg></button>
+  <div class="splash-content">
+    <h1 class="splash-title">8-bit fire</h1>
+    <div class="splash-actions">
+      <button id="start" class="primary start" type="button">Accendi il fuoco</button>
+    </div>
+  </div>
+</div>
+
+<main class="app" id="app" inert>
+  <div class="stage" id="stage">
+    <canvas id="fire" role="img" aria-label="Fuoco in pixel art. Un tocco al centro lo riaccende, due tocchi lo spengono; trascina in verticale per l'intensità, in orizzontale per il vento"></canvas>
+    <div class="hud" id="hud" aria-hidden="true"><span id="hudKey">Intensità</span><b id="hudVal"><span class="roll v" id="hudMain"><span>7</span></span><span id="hudSuf">/10</span></b></div>
+    <div class="corner" id="corner">
+      <button id="sound" class="icon glass btn-2" type="button" aria-pressed="false" aria-label="Audio">
+        <svg class="off" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9.5l5 5M22 9.5l-5 5"/></svg>
+        <svg class="on" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>
+      </button>
+      <button id="fullscreen" class="icon glass btn-2" type="button" aria-pressed="false" aria-label="Schermo intero">
+        <svg class="off" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+        <svg class="on" viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
+      </button>
+    </div>
+    <div class="corner left" id="cornerLeft">
+      <button id="exit" class="glass btn-2 exit" type="button">Esci</button>
+    </div>
+  </div>
+
+  <nav class="ui" id="ui" aria-label="Controlli del fuoco">
+    <div class="ui-inner">
+      <div class="row">
+        <div class="meta"><span class="k" id="windK">Vento</span><output id="windOut"><span class="roll" id="windTxt"><span>Sinistra</span></span></output></div>
+        <div class="wind" role="radiogroup" aria-labelledby="windK">
+          <button class="btn-2" type="button" role="radio" data-wind="-1" aria-label="Verso sinistra"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+          <button class="btn-2" type="button" role="radio" data-wind="0" aria-label="Fermo, fiamme dritte"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+          <button class="btn-2" type="button" role="radio" data-wind="1" aria-label="Verso destra"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="meta"><span class="k" id="levelK">Intensità</span><output id="levelOut"><span class="roll v" id="levelNum"><span>7</span></span>/10</output></div>
+        <input type="range" id="level" min="1" max="10" step="1" value="7" aria-labelledby="levelK">
+      </div>
+
+      <div class="actions">
+        <button id="power" class="primary power is-on" type="button">Spegni il fuoco</button>
+        <button id="openSettings" class="icon btn-2" type="button" aria-label="Impostazioni" aria-haspopup="dialog"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
+      </div>
+    </div>
+  </nav>
+</main>
+
+<div id="announce" class="sr-only" aria-live="polite"></div>
+
+<dialog id="settings" class="sheet" aria-labelledby="settingsTitle">
+  <div class="sheet-inner">
+    <div class="sheet-head">
+      <h2 id="settingsTitle">Impostazioni</h2>
+      <button id="closeSettings" class="icon btn-2" type="button" aria-label="Chiudi"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+
+    <div class="row">
+      <div class="meta"><span class="k" id="heightK">Altezza</span><output id="heightOut" for="height"><span class="roll v" id="heightNum"><span>100</span></span>%</output></div>
+      <input type="range" id="height" min="10" max="100" step="5" value="100" aria-labelledby="heightK">
+    </div>
+
+    <div class="row">
+      <div class="meta"><span class="k" id="cellK">Celle</span><output id="cellOut" for="cell"><span class="roll v" id="cellNum"><span>8</span></span> px</output></div>
+      <input type="range" id="cell" min="0" max="5" step="1" value="1" aria-labelledby="cellK">
+    </div>
+
+    <div class="row">
+      <div class="meta"><span class="k" id="fpsK">Velocità</span><output id="fpsOut" for="fps"><span class="roll v" id="fpsNum"><span>20</span></span> fps</output></div>
+      <input type="range" id="fps" min="20" max="60" step="5" value="20" aria-labelledby="fpsK">
+    </div>
+
+    <button id="openControlsFromSettings" class="btn-2 txt reset" type="button" aria-haspopup="dialog">Controlli e gesti</button>
+    <button id="resetSettings" class="primary reset" type="button">Ripristina valori predefiniti</button>
+  </div>
+</dialog>
+
+<dialog id="controls" class="sheet page" aria-labelledby="controlsTitle">
+  <div class="page-head">
+    <div class="title">
+      <button id="backControls" class="icon btn-2 back" type="button" aria-label="Torna alle impostazioni"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+      <h2 id="controlsTitle">Controlli</h2>
+    </div>
+    <button id="closeControls" class="icon btn-2 close" type="button" aria-label="Chiudi"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="page-body" id="controlsBody">
+    <p class="page-intro reveal" style="--i:0">Il fuoco si comanda con le dita, direttamente sopra le fiamme, oppure con il pannello in basso.</p>
+
+    <section class="ctl-group reveal" style="--i:1" aria-labelledby="gFire">
+      <h3 id="gFire">Sul fuoco</h3>
+      <ul class="ctl-list">
+        <li class="ctl"><div class="demo tap" aria-hidden="true"><div class="fl"></div><div class="ring"></div><div class="finger"></div></div>
+          <div class="ctl-text"><b>Tocca al centro</b><span>Un tocco riaccende il fuoco spento. A fuoco acceso servono due tocchi ravvicinati per spegnerlo.</span></div></li>
+        <li class="ctl"><div class="demo v" aria-hidden="true"><div class="fl"></div><div class="finger"></div></div>
+          <div class="ctl-text"><b>Trascina in su o in giù</b><span>Alza o abbassa l'intensità da 1 a 10. Il valore segue il dito e si ferma sul livello più vicino quando lo stacchi.</span></div></li>
+        <li class="ctl"><div class="demo h" aria-hidden="true"><div class="fl"></div><div class="finger"></div></div>
+          <div class="ctl-text"><b>Trascina a sinistra o a destra</b><span>Sposta il vento a passi: sinistra, fermo, destra. Funziona a fuoco acceso.</span></div></li>
+        <li class="ctl"><div class="demo off" aria-hidden="true"><div class="fl"></div><div class="finger"></div></div>
+          <div class="ctl-text"><b>A fuoco spento, trascina in su</b><span>Riaccende il fuoco partendo da intensità 1.</span></div></li>
+      </ul>
+    </section>
+
+    <section class="ctl-group reveal" style="--i:2" aria-labelledby="gPanel">
+      <h3 id="gPanel">Pannello</h3>
+      <ul class="ctl-list">
+        <li class="ctl"><div class="ctl-ico wide" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+          <div class="ctl-text"><b>Vento</b><span>Le frecce scelgono il verso delle fiamme; quella in su le tiene dritte. A fuoco spento sono disattivate.</span></div></li>
+        <li class="ctl"><div class="ctl-ico" aria-hidden="true"><span class="mini-flame"></span></div>
+          <div class="ctl-text"><b>Intensità</b><span>Lo slider a 10 scatti fa lo stesso del trascinamento verticale.</span></div></li>
+        <li class="ctl"><div class="ctl-ico" aria-hidden="true"><span class="mini-primary"></span></div>
+          <div class="ctl-text"><b>Accendi e spegni</b><span>Arancio quando il fuoco è spento, neutro quando è acceso. Ogni riaccensione riporta intensità 7 e vento a sinistra.</span></div></li>
+        <li class="ctl"><div class="ctl-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></div>
+          <div class="ctl-text"><b>Impostazioni</b><span>Altezza delle fiamme, dimensione delle celle e velocità. Da desktop il pannello entra da destra.</span></div></li>
+      </ul>
+    </section>
+
+    <section class="ctl-group reveal" style="--i:3" aria-labelledby="gTop">
+      <h3 id="gTop">In alto</h3>
+      <ul class="ctl-list">
+        <li class="ctl"><div class="ctl-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg></div>
+          <div class="ctl-text"><b>Audio</b><span>In alto a destra. Il suono del fuoco, che cresce con l'intensità. Si sente anche con il tasto silenzioso.</span></div></li>
+        <li class="ctl"><div class="ctl-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></div>
+          <div class="ctl-text"><b>Schermo intero</b><span>Nasconde il pannello e porta il fuoco fino al fondo dello schermo. Lo stesso tasto torna indietro.</span></div></li>
+        <li class="ctl"><div class="ctl-ico txt" aria-hidden="true">Esci</div>
+          <div class="ctl-text"><b>Esci</b><span>In alto a sinistra: torna alla schermata iniziale e spegne l'audio.</span></div></li>
+      </ul>
+    </section>
+
+    <section class="ctl-group reveal" style="--i:4" aria-labelledby="gSet">
+      <h3 id="gSet">Impostazioni</h3>
+      <ul class="kbd-list">
+        <li><b class="ctl-term">Altezza</b><span>Quanto salgono le fiamme, dal 10 al 100%.</span></li>
+        <li><b class="ctl-term">Celle</b><span>La grandezza dei pixel, da 4 a 48 px.</span></li>
+        <li><b class="ctl-term">Velocità</b><span>I passi del fuoco al secondo, da 20 a 60.</span></li>
+        <li><b class="ctl-term">Ripristina</b><span>Torna a 100%, 8 px e 20 fps.</span></li>
+      </ul>
+    </section>
+
+    <section class="ctl-group reveal" style="--i:5" aria-labelledby="gKeys">
+      <h3 id="gKeys">Tastiera</h3>
+      <ul class="kbd-list">
+        <li><span class="kbd-keys"><kbd>Spazio</kbd></span><span>Accende e spegne</span></li>
+        <li><span class="kbd-keys"><kbd>+</kbd><kbd>−</kbd></span><span>Intensità</span></li>
+        <li><span class="kbd-keys"><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></span><span>Vento: sinistra, fermo, destra</span></li>
+        <li><span class="kbd-keys"><kbd>F</kbd></span><span>Schermo intero</span></li>
+        <li><span class="kbd-keys"><kbd>M</kbd></span><span>Audio</span></li>
+        <li><span class="kbd-keys"><kbd>H</kbd></span><span>Nasconde e mostra l'interfaccia</span></li>
+        <li><span class="kbd-keys"><kbd>Esc</kbd></span><span>Chiude impostazioni e controlli</span></li>
+      </ul>
+    </section>
+  </div>
+</dialog>
+
+<script>
+(() => {
+  const MAX = 36;
+  const CELL_SIZES = [4, 8, 16, 24, 32, 48];
+  const WIND_NAMES = { '-1': 'Sinistra', '0': 'Fermo', '1': 'Destra' };
+
+  // Palette classica: indice 0 = nero, 36 = bianco
+  const PALETTE = [
+    [7,7,7],[31,7,7],[47,15,7],[71,15,7],[87,23,7],[103,31,7],[119,31,7],[143,39,7],
+    [159,47,7],[175,63,7],[191,71,7],[199,71,7],[223,79,7],[223,87,7],[223,87,7],[215,95,7],
+    [215,95,7],[215,103,15],[207,111,15],[207,119,15],[207,127,15],[207,135,23],[199,135,23],[199,143,23],
+    [199,151,31],[191,159,31],[191,159,31],[191,167,39],[191,167,39],[191,175,47],[183,175,47],[183,183,47],
+    [183,183,55],[207,207,111],[223,223,159],[239,239,199],[255,255,255]
+  ];
+  const PAL32 = new Uint32Array(PALETTE.map(([r, g, b]) => ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0));
+
+  // Impostazioni (ricordate in questo browser, se possibile)
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const KEY = 'fuoco8bit-v4';
+  // Valori predefiniti. Intensità e vento tornano a questi a ogni riaccensione;
+  // altezza, celle e velocità sono impostazioni generali e tornano qui solo con "Ripristina".
+  const DEFAULTS = { level: 7, wind: -1, height: 100, cell: 8, fps: 20 };
+  const S = { on: true, ...DEFAULTS };
+  try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+  S.level = Math.max(1, Math.min(10, S.level | 0));
+  const step5 = v => Math.round(v / 5) * 5;
+  S.height = Math.max(10, Math.min(100, step5(+S.height || DEFAULTS.height)));
+  S.fps = Math.max(20, Math.min(60, step5(+S.fps || DEFAULTS.fps)));
+  if (!CELL_SIZES.includes(S.cell)) S.cell = 8;
+  if (![-1, 0, 1].includes(S.wind)) S.wind = -1;
+  delete S.keys;
+
+  const stage = document.getElementById('stage');
+  const cv = document.getElementById('fire');
+  const ctx = cv.getContext('2d');
+  let W = 0, H = 0, cells = null, img, px;
+  let n = 2, p = 0.5;
+
+  // xorshift32: veloce, sufficiente per un fuoco
+  let seed = (Math.random() * 4294967295) >>> 0 || 1;
+  const rand = () => { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5; return (seed >>> 0) / 4294967296; };
+
+  // L'intensità può essere frazionaria (durante il trascinamento). La base non salta:
+  // insegue il valore richiesto con una costante di tempo di 0,12 s, così ogni cambio è fluido.
+  const target = () => S.on ? MAX * S.level / 10 : 0;
+  let heat = 0;
+  function base() {
+    const k = 1 - Math.exp(-(1 / S.fps) / 0.12);
+    heat += (target() - heat) * k;
+    return Math.round(heat);
+  }
+
+  // Il sottratto r è 0, 1 o 2 (somma di due lanci con probabilità p).
+  // L'altezza sposta p: fiamme alte = r piccolo in media, fiamme basse = r grande.
+  // Se la griglia è troppo bassa per arrivarci con 2, si aggiunge un lancio (r fino a 3, 4…).
+  function tune() {
+    const rows = Math.max(1, (S.height / 100) * H);
+    const d = MAX / rows;
+    n = d <= 1.4 ? 2 : Math.ceil(d / 0.7);
+    p = Math.min(1, d / n);
+  }
+
+  function step() {
+    const b = base(), last = (H - 1) * W, dir = S.wind;
+    for (let x = 0; x < W; x++) cells[last + x] = b;
+    for (let y = 0; y < H - 1; y++) {
+      const row = y * W, below = row + W;
+      for (let x = 0; x < W; x++) {
+        let r = 0;
+        for (let k = 0; k < n; k++) if (rand() < p) r++;
+        const v = cells[below + x];
+        let tx = x + dir * r;                 // stesso r usato per il vento: sinistra, destra o fermo
+        while (tx < 0) tx += W;
+        while (tx >= W) tx -= W;
+        cells[row + tx] = v > r ? v - r : 0;
+      }
+    }
+  }
+
+  function draw() {
+    for (let i = 0; i < cells.length; i++) px[i] = PAL32[cells[i]];
+    ctx.putImageData(img, 0, 0);
+  }
+
+  // Ricostruisce la griglia sull'area del fuoco. Se cambia solo la viewport,
+  // conserva il fuoco esistente allineato in basso; se cambia la cella, lo riscalda da capo.
+  // fit: area da coprire in px quando il foglio impostazioni è aperto (il fuoco rimpicciolito
+  // deve riempire tutto lo spazio sopra il foglio); null = l'area del fuoco.
+  // La griglia è centrata orizzontalmente sull'area; curLeft è il suo scostamento in px.
+  let fit = null, curLeft = 0;
+  function build(preserve) {
+    const rect = stage.getBoundingClientRect();
+    const bw = fit ? fit.w : rect.width, bh = fit ? fit.h : rect.height;
+    const nW = Math.max(1, Math.ceil(bw / S.cell));
+    const nH = Math.max(2, Math.ceil(bh / S.cell));
+    const left = Math.floor((rect.width - nW * S.cell) / 2);
+    if (preserve && cells && nW === W && nH === H && left === curLeft) return;
+    const old = cells, oW = W, oH = H, dx = Math.round((curLeft - left) / S.cell);
+    W = nW; H = nH; curLeft = left;
+    cv.width = W; cv.height = H;
+    cv.style.width = W * S.cell + 'px';
+    cv.style.height = H * S.cell + 'px';
+    cv.style.left = left + 'px';
+    cells = new Uint8Array(W * H);
+    img = ctx.createImageData(W, H);
+    px = new Uint32Array(img.data.buffer);
+    tune();
+    if (preserve && old) {
+      // Copia allineata in basso e nella stessa posizione sullo schermo; le colonne nuove ai lati
+      // ripetono quelle esistenti, le righe nuove in alto partono vuote e le fiamme ci salgono da sole
+      const rows = Math.min(oH, H);
+      for (let y = 0; y < rows; y++) {
+        const src = (oH - 1 - y) * oW, dst = (H - 1 - y) * W;
+        for (let x = 0; x < W; x++) cells[dst + x] = old[src + (((x - dx) % oW) + oW) % oW];
+      }
+      if (oH < 8) { heat = target(); for (let i = 0; i < H; i++) step(); }   // la pagina era partita vuota
+    } else {
+      heat = target();
+      for (let i = 0; i < H; i++) step();   // pre-riscaldo: le fiamme ci sono già al primo frame
+    }
+    draw();
+  }
+
+  // Loop a passo fisso
+  let last = performance.now(), acc = 0, started = false;
+  function frame(now) {
+    if (!started) { last = now; requestAnimationFrame(frame); return; }
+    acc += Math.min(now - last, 250);
+    last = now;
+    const dt = 1000 / S.fps;
+    let did = false;
+    while (acc >= dt) { step(); acc -= dt; did = true; }
+    if (did) draw();
+    requestAnimationFrame(frame);
+  }
+
+  // ---- UI ----
+  const $ = id => document.getElementById(id);
+  const ui = $('ui'), powerBtn = $('power');
+  const levelIn = $('level'), cellIn = $('cell'), height = $('height'), fps = $('fps');
+  const windBtns = Array.from(document.querySelectorAll('[data-wind]'));
+
+  // Icona fiamma bianca piena per il cursore dell'intensità. Sotto la fiamma, lo stesso profilo
+  // ingrossato di 2px nel colore del pannello: "taglia" la barra intorno alla fiamma.
+  // viewBox allargato di 2 unità per lato per non tagliare il contorno (1 unità = 1,25px).
+  const FLAME_PATH = 'M8.8 1C11 3.6 13.6 5 15.5 6.9C17.9 9.3 19.2 11.9 18.8 15.2C18.6 17.4 17.6 19 16.4 20.4C18.2 20.4 19.8 19.2 20.6 17.2C22.8 19.4 23.4 23.2 22.2 26.2C20.6 29.8 16.8 31.4 12 31.4C6 31.4 1.2 27.6 1.2 22.2C1.2 19 2.2 16.4 3.6 14.4C4.2 16.6 5.8 18.4 7.8 18.4C9.8 18.4 10.8 16.8 10.2 14.6C9.6 12.4 7.4 10.8 7.2 7.6C7 5 7.6 2.8 8.8 1Z';
+  const FLAME_ICON = (() => {
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='-2 -2 28 36'><path d='${FLAME_PATH}' fill='%23141210' stroke='%23141210' stroke-width='3.2' stroke-linejoin='round'/><path fill='%23f4f1ec' d='${FLAME_PATH}'/></svg>`;
+    return `url("data:image/svg+xml,${svg.replace(/</g, '%3C').replace(/>/g, '%3E')}")`;
+  })();
+
+  // Sostituisce il testo di un .roll animando l'uscita del vecchio e l'entrata del nuovo.
+  // order è il valore numerico (livello o vento): il verso dell'animazione dipende da se sale o scende.
+  //   asse y: valore che sale -> il vecchio esce in alto, il nuovo arriva dal basso (come un contachilometri)
+  //   asse x: vento verso destra -> il vecchio esce a destra, il nuovo arriva da sinistra (e viceversa)
+  const ROLL_EASE = 'cubic-bezier(0.32, 0.72, 0, 1)';
+  // quiet: i valori cambiano senza animazione (trascinamento sul fuoco, tastiera): azioni rapide e ripetute
+  let quiet = false;
+  function swapRoll(roll, text, axis, order) {
+    text = String(text);
+    const prev = parseFloat(roll.dataset.order);
+    roll.dataset.order = order;
+    const cur = roll.lastElementChild;
+    if (cur && cur.textContent === text) return;
+    const dir = Math.sign(order - prev);
+    const fresh = document.createElement('span');
+    fresh.textContent = text;
+    if (reduced || quiet || !dir || !cur || !roll.animate) { roll.replaceChildren(fresh); return; }
+    roll.querySelectorAll('[data-leaving]').forEach(n => n.remove());
+    roll.appendChild(fresh);
+    cur.dataset.leaving = '1';
+    const T = axis === 'y' ? 'translateY' : 'translateX';
+    const dist = axis === 'y' ? 100 : 60;               // y: un'intera riga; x: 60% della larghezza della parola, sfumato
+    const unit = '%';
+    const outTo = (axis === 'y' ? -dir : dir) * dist;
+    const opts = { duration: 180, easing: ROLL_EASE };
+    cur.animate([{ transform: `${T}(0)`, opacity: 1 }, { transform: `${T}(${outTo}${unit})`, opacity: 0 }], { ...opts, fill: 'forwards' })
+      .onfinish = () => cur.remove();
+    fresh.animate([{ transform: `${T}(${-outTo}${unit})`, opacity: 0 }, { transform: `${T}(0)`, opacity: 1 }], opts);
+  }
+  const levelNum = $('levelNum'), windTxt = $('windTxt');
+  const heightNum = $('heightNum'), cellNum = $('cellNum'), fpsNum = $('fpsNum');
+
+  const fill = el => el.style.setProperty('--pct', ((el.value - el.min) / (el.max - el.min)) * 100 + '%');
+
+  function render() {
+    // l'etichetta dice l'azione; niente aria-pressed (sarebbe "Spegni il fuoco, premuto")
+    powerBtn.textContent = S.on ? 'Spegni il fuoco' : 'Accendi il fuoco';
+    powerBtn.classList.toggle('is-on', S.on);
+    const lv = Math.round(S.level);
+    swapRoll(levelNum, lv, 'y', lv);
+    levelIn.value = lv; fill(levelIn);
+    levelIn.style.setProperty('--flame', FLAME_ICON);
+    levelIn.setAttribute('aria-valuetext', lv + ' su 10');
+    height.value = S.height; swapRoll(heightNum, S.height, 'y', S.height); fill(height);
+    height.setAttribute('aria-valuetext', S.height + ' per cento');
+    fps.value = S.fps; swapRoll(fpsNum, S.fps, 'y', S.fps); fill(fps);
+    fps.setAttribute('aria-valuetext', S.fps + ' fotogrammi al secondo');
+    cellIn.value = CELL_SIZES.indexOf(S.cell); swapRoll(cellNum, S.cell, 'y', S.cell); fill(cellIn);
+    cellIn.setAttribute('aria-valuetext', S.cell + ' pixel');
+    // A fuoco spento il vento è disattivato e nessun pulsante risulta selezionato
+    windBtns.forEach(b => { b.setAttribute('aria-checked', String(S.on && +b.dataset.wind === S.wind)); b.disabled = !S.on; });
+    swapRoll(windTxt, S.on ? WIND_NAMES[S.wind] : 'Nessuno', 'x', S.on ? S.wind : NaN);
+    updateAudio();
+  }
+
+  const togglePower = () => {
+    S.on = !S.on;
+    if (S.on) { S.level = DEFAULTS.level; S.wind = DEFAULTS.wind; }
+    playFx(S.on ? 'on' : 'off');
+    render(); save();
+  };
+  const setLevel = v => { S.level = Math.max(1, Math.min(10, Math.round(v))); render(); save(); };
+  const setWind = v => { S.wind = v; render(); save(); };
+  let hideAll = false, immersive = false;
+  function applyUI() {
+    ui.hidden = hideAll || immersive;
+    $('corner').hidden = hideAll;
+    $('cornerLeft').hidden = hideAll;
+    document.body.classList.toggle('ui-hidden', hideAll);
+  }
+  const toggleUI = () => { hideAll = !hideAll; applyUI(); };
+
+  // ---- Audio: due registrazioni di fuoco in loop, mixate in dissolvenza secondo l'intensità ----
+  // Intensità 1: 95/5, 7: 60/40, 10: 25/75 (basso/alto). Lineare tra questi punti, anche sui valori frazionari del trascinamento.
+  // Le due tracce (AAC 128k) sono incorporate nella pagina in base64: nessun download separato,
+  // funziona anche dove i file accanto alla pagina non vengono serviti. Si decodificano al primo tocco.
+  const soundBtn = $('sound');
+  const TRACKS = { low: 'audio-low', high: 'audio-high' };
+  let ac = null, master = null, lowGain = null, highGain = null, loading = null, soundOn = false, suspendT = 0;
+
+  function initAudio() {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    ac = new AC();
+    master = ac.createGain(); master.gain.value = 0; master.connect(ac.destination);
+    lowGain = ac.createGain(); lowGain.connect(master);
+    highGain = ac.createGain(); highGain.connect(master);
+    mixLevels(true);
+    const bytes = id => {
+      const bin = atob(document.getElementById(id).textContent.trim());
+      const out = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+      return out.buffer;
+    };
+    const decode = data => new Promise((ok, fail) => {
+      const r = ac.decodeAudioData(data, ok, fail);       // forma a callback: va anche sui Safari più vecchi
+      if (r && r.then) r.then(ok, fail);
+    });
+    const load = (id, out) => Promise.resolve()
+      .then(() => decode(bytes(id)))
+      .then(buf => {
+        const src = ac.createBufferSource();
+        src.buffer = buf; src.loop = true;
+        src.loopStart = 0.05; src.loopEnd = buf.duration - 0.05;   // salta il silenzio di codifica ai bordi dell'mp3
+        src.connect(out);
+        src.start(0, 0.05);
+      });
+    return Promise.all([load(TRACKS.low, lowGain), load(TRACKS.high, highGain)]);
+  }
+
+  function mixLevels(instant) {
+    const L = S.level;
+    const low = L <= 7 ? 0.95 - ((L - 1) / 6) * 0.35 : 0.60 - ((L - 7) / 3) * 0.35, high = 1 - low;
+    if (instant) { lowGain.gain.value = low; highGain.gain.value = high; return; }
+    lowGain.gain.setTargetAtTime(low, ac.currentTime, 0.15);
+    highGain.gain.setTargetAtTime(high, ac.currentTime, 0.15);
+  }
+
+  const VOLUME = 0.7;                     // volume generale: -30% rispetto al livello originale dei file
+  let duck = 1;                           // 0.5 con le impostazioni aperte, 1 altrimenti
+  function updateAudio() {
+    if (!ac) return;
+    mixLevels(false);
+    master.gain.setTargetAtTime(soundOn && S.on ? VOLUME * duck : 0, ac.currentTime, S.on ? 0.3 : 0.8);
+  }
+
+  // ---- Suoni di feedback per accensione e spegnimento ----
+  // Famiglia unica: rumore filtrato, timbro "aria e fuoco", nessuna nota.
+  //   accensione: sfregamento di fiammifero (click secco) + soffio che sale 300 -> 2400 Hz, 450ms. Verso l'alto = si attiva.
+  //   spegnimento: soffio che scende 1800 -> 250 Hz con coda più lunga, 600ms. Verso il basso = si chiude.
+  // Livello: circa -4dB sotto il fuoco, segue mute, volume generale e attenuazione delle impostazioni.
+  // Non suonano se l'audio è spento; il riscontro visivo (pulsante, etichetta) c'è sempre.
+  let noiseBuf = null, lastFx = 0;
+  function noise() {
+    if (!noiseBuf) {
+      noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    const src = ac.createBufferSource();
+    src.buffer = noiseBuf;
+    return src;
+  }
+  function burst(t, { type, from, to, q, peak, attack, dur }) {
+    const src = noise(), f = ac.createBiquadFilter(), g = ac.createGain();
+    f.type = type; f.Q.value = q;
+    f.frequency.setValueAtTime(from, t);
+    if (to !== from) f.frequency.exponentialRampToValueAtTime(to, t + dur * 0.8);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(peak, t + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f).connect(g).connect(ac.destination);
+    src.start(t, Math.random() * 0.3, dur + 0.05);
+  }
+  function playFx(kind) {
+    if (!ac || !soundOn || ac.state !== 'running') return;
+    const now = performance.now();
+    if (now - lastFx < 150) return;               // niente raffiche se si tocca in fretta
+    lastFx = now;
+    const t = ac.currentTime + 0.01, k = VOLUME * duck * 0.65 * 0.75;   // feedback a -25%
+    if (kind === 'on') {
+      burst(t, { type: 'highpass', from: 3200, to: 3200, q: 0.7, peak: 0.5 * k, attack: 0.003, dur: 0.04 });
+      burst(t + 0.02, { type: 'bandpass', from: 300, to: 2400, q: 1.1, peak: 0.9 * k, attack: 0.05, dur: 0.45 });
+    } else {
+      burst(t, { type: 'bandpass', from: 1800, to: 250, q: 0.9, peak: 0.8 * k, attack: 0.04, dur: 0.6 });
+    }
+  }
+
+  // iPhone: Web Audio segue il tasto silenzioso, un elemento <audio> in riproduzione no (come un video).
+  // Un <audio> muto in loop, avviato al tocco, mette la sessione in modalità riproduzione
+  // e così anche il mix del fuoco si sente con il silenzioso attivo.
+  let keepAlive = null;
+  function silentWav() {
+    const sr = 8000, n = sr, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+    const w = (o, str) => { for (let i = 0; i < str.length; i++) v.setUint8(o + i, str.charCodeAt(i)); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt ');
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    w(36, 'data'); v.setUint32(40, n * 2, true);
+    return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+  }
+  function startKeepAlive() {
+    if (!keepAlive) {
+      keepAlive = document.createElement('audio');
+      keepAlive.loop = true;
+      keepAlive.preload = 'auto';
+      keepAlive.setAttribute('playsinline', '');
+      keepAlive.src = 'audio/silenzio.wav';
+      keepAlive.addEventListener('error', () => {
+        if (keepAlive.dataset.fallback) return;
+        keepAlive.dataset.fallback = '1';                 // se il file non viene servito, lo genero in memoria
+        keepAlive.src = silentWav();
+        if (soundOn) keepAlive.play().catch(() => {});
+      });
+    }
+    const p = keepAlive.play();
+    if (p && p.catch) p.catch(() => {});
+  }
+
+  function setSound(on) {
+    if (on) startKeepAlive();
+    if (on && !ac) {
+      loading = initAudio();
+      if (!loading) return;
+      loading.catch(() => {
+        soundOn = false;
+        soundBtn.setAttribute('aria-pressed', 'false');
+        soundBtn.disabled = true;
+        soundBtn.setAttribute('aria-label', 'Audio non disponibile');
+      });
+    }
+    soundOn = on;
+    clearTimeout(suspendT);
+    if (on) {
+      try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+      ac.resume();
+    }
+    else if (ac) suspendT = setTimeout(() => { if (!soundOn) { ac.suspend(); if (keepAlive) keepAlive.pause(); } }, 1500);
+    updateAudio();
+    soundBtn.setAttribute('aria-pressed', String(on));
+
+  }
+  soundBtn.addEventListener('click', () => setSound(!soundOn));
+  document.addEventListener('visibilitychange', () => {
+    if (!ac || !soundOn) return;
+    if (document.hidden) ac.suspend(); else ac.resume();
+  });
+
+  // ---- Schermo intero ----
+  // Nasconde il pannello e porta il fuoco fino al fondo dello schermo. Dove il browser lo consente
+  // (Android, desktop) chiede anche lo schermo intero vero; su iPhone resta la sola modalità a pagina piena.
+  const fsBtn = $('fullscreen');
+  const root = document.documentElement;
+  const fsEnabled = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+  const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement;
+  function setImmersive(on) {
+    immersive = on;
+    root.classList.toggle('immersive', on);
+    applyUI();
+    fsBtn.setAttribute('aria-pressed', String(on));
+
+    if (!fsEnabled) return;
+    try {
+      if (on && !fsElement()) {
+        const r = (root.requestFullscreen || root.webkitRequestFullscreen).call(root);
+        if (r && r.catch) r.catch(() => {});
+      } else if (!on && fsElement()) {
+        const r = (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+        if (r && r.catch) r.catch(() => {});
+      }
+    } catch (e) {}
+  }
+  const toggleFullscreen = () => setImmersive(!immersive);
+  // Se si esce dallo schermo intero del browser (Esc, gesto indietro), torna anche il pannello
+  const onFsChange = () => { if (!fsElement() && immersive) setImmersive(false); };
+  document.addEventListener('fullscreenchange', onFsChange);
+  document.addEventListener('webkitfullscreenchange', onFsChange);
+  fsBtn.addEventListener('click', toggleFullscreen);
+
+  powerBtn.addEventListener('click', togglePower);
+  levelIn.addEventListener('input', () => setLevel(+levelIn.value));
+
+  // ---- Gesti sull'area del fuoco (con pannello visibile e a schermo intero) ----
+  // Il gesto si decide dopo 10px di movimento e resta quello fino al rilascio:
+  //   verticale   -> intensità: su = più intenso. A fuoco spento, verso l'alto lo riaccende da 1. Mezza altezza copre 1-10, il valore segue il dito
+  //                  senza scatti e al rilascio si aggancia all'intero più vicino.
+  //   orizzontale -> vento (solo a fuoco acceso): ogni 72px (o 18% della larghezza) un passo, sinistra -> fermo -> destra.
+  //   nessun movimento, rilascio entro 400ms nella zona centrale (75% dell'area) -> accende/spegne.
+  const hud = $('hud'), hudKey = $('hudKey'), hudMain = $('hudMain'), hudSuf = $('hudSuf');
+  let gesture = null, hudT = 0;
+  const LOCK = 10;
+  function showHud(key, main, suf, axis, order, hold) {
+    if (hud.dataset.key !== key) { hud.dataset.key = key; hudMain.dataset.order = ''; }   // cambio di grandezza: niente animazione
+    hudKey.textContent = key; hudSuf.textContent = suf;
+    hudMain.classList.toggle('v', axis === 'y');
+    swapRoll(hudMain, main, axis || 'y', order);
+    clearTimeout(hudT);
+    hud.classList.add('show');
+    if (!hold) hudT = setTimeout(() => hud.classList.remove('show'), 900);
+  }
+  // Annunci per lettori di schermo: solo il valore finale, non ogni passo del trascinamento
+  const announcer = $('announce');
+  function announce(t) { announcer.textContent = ''; requestAnimationFrame(() => { announcer.textContent = t; }); }
+  let lastTap = 0;
+  const hideHudSoon = () => { clearTimeout(hudT); hudT = setTimeout(() => hud.classList.remove('show'), 700); };
+  const inCenter = (x, y) => {
+    const r = stage.getBoundingClientRect();
+    const m = (1 - Math.sqrt(0.75)) / 2;          // rettangolo centrale con il 75% dell'area: ~6,7% di margine per lato
+    return x > r.left + r.width * m && x < r.right - r.width * m && y > r.top + r.height * m && y < r.bottom - r.height * m;
+  };
+  stage.addEventListener('pointerdown', e => {
+    if (e.target.closest('button') || (e.pointerType === 'mouse' && e.button !== 0) || gesture) return;
+    gesture = {
+      id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), mode: null,
+      level: S.level, wind: S.wind, wasOff: !S.on,
+      vSpan: Math.max(160, stage.clientHeight * 0.5),
+      hStep: Math.max(72, stage.clientWidth * 0.18)
+    };
+    stage.setPointerCapture(e.pointerId);
+  });
+  stage.addEventListener('pointermove', e => {
+    const g = gesture;
+    if (!g || e.pointerId !== g.id) return;
+    const dx = e.clientX - g.x, dy = e.clientY - g.y;
+    if (!g.mode) {
+      if (Math.abs(dx) < LOCK && Math.abs(dy) < LOCK) return;
+      g.mode = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
+      quiet = true;
+    }
+    if (g.mode === 'v') {
+      if (g.wasOff) {
+        // A fuoco spento solo il trascinamento verso l'alto conta: riaccende partendo da intensità 1
+        if (!S.on && dy >= 0) return;
+        if (!S.on) { S.on = true; S.wind = DEFAULTS.wind; playFx('on'); }
+        g.level = 1;
+      }
+      S.level = Math.max(1, Math.min(10, g.level + (-dy / g.vSpan) * 9));
+      render();
+      showHud('Intensità', Math.round(S.level), '/10', 'y', Math.round(S.level), true);
+    } else {
+      if (!S.on) return;                          // a fuoco spento il vento non si sposta
+      const w = Math.max(-1, Math.min(1, g.wind + Math.trunc(dx / g.hStep)));
+      if (w !== S.wind) { S.wind = w; render(); }
+      showHud('Vento', WIND_NAMES[S.wind], '', 'x', S.wind, true);
+    }
+  });
+  const endGesture = e => {
+    const g = gesture;
+    if (!g || e.pointerId !== g.id) return;
+    gesture = null;
+    if (g.mode === 'v') { if (S.on) { setLevel(S.level); hideHudSoon(); announce('Intensità ' + Math.round(S.level) + ' su 10'); } }
+    else if (g.mode === 'h') { save(); hideHudSoon(); if (S.on) announce('Vento ' + WIND_NAMES[S.wind].toLowerCase()); }
+    else if (e.type === 'pointerup' && performance.now() - g.t < 400 && inCenter(e.clientX, e.clientY)) {
+      // un tocco riaccende; a fuoco acceso servono due tocchi ravvicinati per spegnere (niente spegnimenti per sbaglio)
+      const now = performance.now();
+      if (!S.on || now - lastTap < 450) {
+        lastTap = 0;
+        togglePower();
+        showHud('Fuoco', S.on ? 'Acceso' : 'Spento', '', null, NaN);
+        announce(S.on ? 'Fuoco acceso' : 'Fuoco spento');
+      } else {
+        lastTap = now;
+        showHud('Fuoco', 'Tocca ancora per spegnere', '', null, NaN);
+      }
+    }
+    quiet = false;
+  };
+  stage.addEventListener('pointerup', endGesture);
+  stage.addEventListener('pointercancel', endGesture);
+  height.addEventListener('input', () => { S.height = +height.value; tune(); render(); save(); });
+  fps.addEventListener('input', () => { S.fps = +fps.value; render(); save(); });
+  $('resetSettings').addEventListener('click', () => {
+    const rebuild = S.cell !== DEFAULTS.cell;
+    S.height = DEFAULTS.height; S.cell = DEFAULTS.cell; S.fps = DEFAULTS.fps;
+    if (rebuild) build(false); else tune();
+    render(); save();
+  });
+  cellIn.addEventListener('input', () => {
+    const size = CELL_SIZES[+cellIn.value];
+    if (size !== S.cell) { S.cell = size; build(false); render(); save(); }
+  });
+  windBtns.forEach(b => b.addEventListener('click', () => setWind(+b.dataset.wind)));
+
+  // Modale impostazioni: si chiude con la X, con Esc o toccando fuori
+  const sheet = $('settings');
+  // Apertura: il fuoco rimpicciolisce al 75% e la sua base sale al bordo superiore del foglio, volume al 50%.
+  // Chiusura: il foglio scende con un'animazione propria, poi il dialog si chiude; fuoco e volume tornano.
+  function setFireMotion(dur, ease) {
+    cv.style.setProperty('--fire-dur', dur); cv.style.setProperty('--fire-ease', ease);
+    if (!reduced) cv.style.willChange = 'transform';
+  }
+  cv.addEventListener('transitionend', e => { if (e.target === cv) cv.style.willChange = ''; });
+  // Al 75% il fuoco deve comunque riempire tutta l'altezza sopra il foglio e tutta la larghezza:
+  // la griglia si allarga a (spazio disponibile / 0.75) prima dello zoom, così dopo lo zoom copre tutto.
+  // Le righe nuove in alto si riempiono con le fiamme che salgono durante l'animazione.
+  const ZOOM = 0.75;
+  let unfitT = 0;
+  function liftFire() {
+    clearTimeout(unfitT);
+    const r = stage.getBoundingClientRect();
+    const sheetTop = window.innerHeight - sheet.offsetHeight;   // il foglio è ancorato in basso
+    fit = { w: r.width / ZOOM, h: Math.max(0, sheetTop - r.top) / ZOOM };
+    build(true);
+    // il ridimensionamento del canvas non deve cadere nel primo frame dello zoom
+    const lift = Math.min(0, sheetTop - r.bottom) + 'px';
+    requestAnimationFrame(() => {
+      if (!sheet.open || sheet.classList.contains('closing')) return;
+      cv.style.setProperty('--lift-fire', lift);
+      cv.style.setProperty('--zoom-fire', String(ZOOM));
+    });
+  }
+  function restoreFire() {
+    cv.style.setProperty('--lift-fire', '0px');
+    cv.style.setProperty('--zoom-fire', '1');
+    duck = 1; updateAudio();
+    // a ritorno finito la griglia torna alle misure dell'area (nessun salto: il centro resta dov'è)
+    clearTimeout(unfitT);
+    unfitT = setTimeout(() => { if (!sheet.open && fit) { fit = null; build(true); } }, reduced ? 0 : 520);
+  }
+  let closeT = 0;
+  function finishClose() {
+    clearTimeout(closeT);
+    sheet.removeEventListener('transitionend', onSheetEnd);
+    if (sheet.classList.contains('closing')) { sheet.classList.remove('closing'); sheet.close(); }
+  }
+  function onSheetEnd(e) { if (e.target === sheet && (e.propertyName === 'transform' || e.propertyName === 'opacity')) finishClose(); }
+  const desktop = window.matchMedia('(min-width: 768px)');
+  // fuoco al suo posto (usato quando il pannello è laterale, su desktop)
+  function settleFire() {
+    cv.style.setProperty('--lift-fire', '0px');
+    cv.style.setProperty('--zoom-fire', '1');
+    clearTimeout(unfitT);
+    unfitT = setTimeout(() => { if (fit) { fit = null; build(true); } }, reduced ? 0 : 520);
+  }
+  $('openSettings').addEventListener('click', () => {
+    // riapertura durante la chiusura: annulla la chiusura e il foglio risale da dove si trova
+    clearTimeout(closeT);
+    sheet.removeEventListener('transitionend', onSheetEnd);
+    if (!sheet.open) { sheet.classList.add('closing'); sheet.showModal(); void sheet.offsetWidth; }
+    sheet.classList.remove('closing');
+    setFireMotion('500ms', 'cubic-bezier(0.32, 0.72, 0, 1)');      // stessa curva e durata del foglio
+    if (!desktop.matches) liftFire();                               // su desktop il pannello è laterale: il fuoco resta
+    duck = 0.5; updateAudio();
+  });
+  function closeSheet() {
+    if (!sheet.open || sheet.classList.contains('closing')) return;
+    setFireMotion('500ms', 'cubic-bezier(0.77, 0, 0.175, 1)');      // ritorno del fuoco: movimento sullo schermo
+    restoreFire();
+    sheet.classList.add('closing');                                 // il foglio scende da dove si trova
+    sheet.addEventListener('transitionend', onSheetEnd);
+    closeT = setTimeout(finishClose, 450);                          // rete di sicurezza se l'evento non arriva
+  }
+  sheet.addEventListener('cancel', e => { e.preventDefault(); closeSheet(); });   // Esc
+  sheet.addEventListener('close', restoreFire);
+  window.addEventListener('resize', () => {
+    if (!sheet.open || sheet.classList.contains('closing')) return;
+    if (desktop.matches) settleFire(); else liftFire();
+  });
+  $('closeSettings').addEventListener('click', closeSheet);
+  sheet.addEventListener('click', e => { if (e.target === sheet) closeSheet(); });
+
+  // ---- Pagina Controlli (dalla splash e dalle impostazioni) ----
+  const controls = $('controls');
+  let ctlT = 0;
+  function ctlFinish() {
+    clearTimeout(ctlT);
+    controls.removeEventListener('transitionend', ctlEnd);
+    if (controls.classList.contains('closing')) { controls.classList.remove('closing', 'nested'); controls.close(); }
+  }
+  function ctlEnd(e) { if (e.target === controls && (e.propertyName === 'transform' || e.propertyName === 'opacity')) ctlFinish(); }
+  // nested: aperta dal foglio impostazioni. Entra da destra dentro il pannello (su desktop occupa lo stesso spazio)
+  // e il contenuto delle impostazioni scivola a sinistra; Indietro (o Esc) ci riporta.
+  function openControls(nested) {
+    clearTimeout(ctlT);
+    controls.removeEventListener('transitionend', ctlEnd);
+    if (!controls.open) {
+      $('controlsBody').scrollTop = 0;
+      controls.classList.toggle('nested', nested);
+      controls.classList.add('closing'); controls.showModal(); void controls.offsetWidth;
+    }
+    controls.classList.remove('closing');
+    sheet.classList.toggle('pushed', nested);
+  }
+  function closeControls() {
+    if (!controls.open || controls.classList.contains('closing')) return;
+    sheet.classList.remove('pushed');
+    controls.classList.add('closing');
+    controls.addEventListener('transitionend', ctlEnd);
+    ctlT = setTimeout(ctlFinish, 450);
+  }
+  controls.addEventListener('cancel', e => { e.preventDefault(); closeControls(); });
+  $('closeControls').addEventListener('click', closeControls);
+  $('backControls').addEventListener('click', closeControls);
+  $('openControls').addEventListener('click', () => openControls(false));
+  $('openControlsFromSettings').addEventListener('click', () => openControls(true));
+  controls.style.setProperty('--flame-icon', FLAME_ICON);
+
+  window.addEventListener('keydown', e => {
+    if (e.metaKey || e.ctrlKey || e.altKey || !started) return;
+    if (document.querySelector('dialog[open]')) return;   // nei fogli i tasti fanno il loro lavoro normale
+    // da tastiera niente animazione dei valori, anche per il cambio nativo degli slider che segue il tasto
+    quiet = true;
+    requestAnimationFrame(() => { if (!gesture || !gesture.mode) quiet = false; });
+    const onRange = document.activeElement?.type === 'range';
+    if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) togglePower(); }
+    else if (e.code === 'KeyH') { if (!e.repeat && !sheet.open) toggleUI(); }
+    else if (e.code === 'KeyM') { if (!e.repeat) setSound(!soundOn); }
+    else if (e.code === 'KeyF') { if (!e.repeat && !sheet.open) toggleFullscreen(); }
+    else if ((e.key === '+' || e.key === '=') && !onRange) setLevel(S.level + 1);
+    else if (e.key === '-' && !onRange) setLevel(S.level - 1);
+    else if (!onRange && S.on && e.key === 'ArrowLeft') setWind(-1);
+    else if (!onRange && S.on && e.key === 'ArrowRight') setWind(1);
+    else if (!onRange && S.on && e.key === 'ArrowDown') setWind(0);
+  });
+
+  // L'area del fuoco segue la viewport (barra degli indirizzi mobile, rotazione, UI nascosta)
+  new ResizeObserver(() => build(true)).observe(stage);
+
+  // ---- Splash ----
+  // Registra 40 frame (2 secondi a 20 fps) del fuoco con le impostazioni predefinite e li ripete in loop.
+  const splash = $('splash'), splashCv = $('splashFire'), sctx = splashCv.getContext('2d');
+  function recordLoop(w, h, frames) {
+    const c = new Uint8Array(w * h), out = [];
+    const d = MAX / h, nn = d <= 1.4 ? 2 : Math.ceil(d / 0.7), pp = Math.min(1, d / nn);
+    const b = Math.round(MAX * DEFAULTS.level / 10), dir = DEFAULTS.wind;
+    const stp = () => {
+      for (let x = 0; x < w; x++) c[(h - 1) * w + x] = b;
+      for (let y = 0; y < h - 1; y++) {
+        const row = y * w, below = row + w;
+        for (let x = 0; x < w; x++) {
+          let r = 0;
+          for (let k = 0; k < nn; k++) if (rand() < pp) r++;
+          const v = c[below + x];
+          let tx = x + dir * r;
+          while (tx < 0) tx += w;
+          c[row + tx] = v > r ? v - r : 0;
+        }
+      }
+    };
+    for (let i = 0; i < h; i++) stp();
+    for (let f = 0; f < frames; f++) { stp(); out.push(c.slice()); }
+    return out;
+  }
+  let splashFrames = [], splashImg = null, splashPx = null, splashOn = true;
+  function buildSplash() {
+    const w = Math.ceil(window.innerWidth / DEFAULTS.cell), h = Math.ceil(window.innerHeight / DEFAULTS.cell);
+    splashCv.width = w; splashCv.height = h;
+    splashCv.style.width = w * DEFAULTS.cell + 'px'; splashCv.style.height = h * DEFAULTS.cell + 'px';
+    splashImg = sctx.createImageData(w, h);
+    splashPx = new Uint32Array(splashImg.data.buffer);
+    splashFrames = recordLoop(w, h, 40);
+  }
+  function splashLoop(now) {
+    if (!splashOn) return;
+    const f = splashFrames[Math.floor(now / (1000 / DEFAULTS.fps)) % splashFrames.length];
+    for (let i = 0; i < f.length; i++) splashPx[i] = PAL32[f[i]];
+    sctx.putImageData(splashImg, 0, 0);
+    requestAnimationFrame(splashLoop);
+  }
+  let splashResizeT = 0;
+  window.addEventListener('resize', () => {
+    if (!splashOn) return;
+    clearTimeout(splashResizeT);
+    splashResizeT = setTimeout(buildSplash, 150);
+  });
+
+  // "Accendi il fuoco": il fuoco parte acceso con intensità e vento predefiniti, la splash sfuma sull'interfaccia
+  $('start').addEventListener('click', e => {
+    if (started) return;
+    S.on = true; S.level = DEFAULTS.level; S.wind = DEFAULTS.wind;
+    heat = target();
+    render(); save();
+    started = true;
+    $('app').inert = false;                          // il gioco diventa raggiungibile solo dopo la splash
+    setFireMotion('600ms', 'cubic-bezier(0.23, 1, 0.32, 1)');
+    document.body.classList.add('started');
+    splash.classList.add('leaving');
+    setTimeout(() => { if (started) { splashOn = false; splash.hidden = true; } }, reduced ? 250 : 800);
+    // il focus non resta sul pulsante della splash che sparisce; l'anello si vede solo se si è usata la tastiera (detail 0)
+    powerBtn.focus({ preventScroll: true, focusVisible: e.detail === 0 });
+    // alla prima partenza la HUD suggerisce i gesti, poi mai più
+    let seen = false;
+    try { seen = localStorage.getItem('fuoco8bit-hint') === '1'; } catch (err) {}
+    if (!seen) setTimeout(() => {
+      if (!started || gesture) return;
+      showHud('Gesti', 'Trascina il fuoco', '', null, NaN, true);
+      clearTimeout(hudT); hudT = setTimeout(() => hud.classList.remove('show'), 3500);
+      try { localStorage.setItem('fuoco8bit-hint', '1'); } catch (err) {}
+    }, 1400);
+  });
+
+  // "Esci": torna alla splash. Chiude impostazioni e schermo intero, spegne l'audio, ferma il fuoco
+  // dietro la splash (che riprende il suo loop) e rimette la CTA a fuoco.
+  $('exit').addEventListener('click', () => {
+    if (!started) return;
+    if (controls.open) { clearTimeout(ctlT); controls.removeEventListener('transitionend', ctlEnd); controls.classList.remove('closing', 'nested'); controls.close(); sheet.classList.remove('pushed'); }
+    if (sheet.open) { clearTimeout(closeT); sheet.removeEventListener('transitionend', onSheetEnd); sheet.classList.remove('closing'); sheet.close(); }
+    if (immersive) setImmersive(false);
+    if (hideAll) toggleUI();
+    if (soundOn) setSound(false);
+    hud.classList.remove('show');
+    started = false;
+    $('app').inert = true;
+    cv.style.removeProperty('--zoom-fire'); cv.style.setProperty('--lift-fire', '0px');
+    setFireMotion('600ms', 'cubic-bezier(0.23, 1, 0.32, 1)');
+    document.body.classList.remove('started');
+    buildSplash();
+    splashOn = true;
+    requestAnimationFrame(splashLoop);
+    splash.hidden = false;
+    splash.classList.add('leaving');
+    void splash.offsetWidth;                     // parte da trasparente, poi sfuma in entrata
+    splash.classList.remove('leaving');
+    $('start').focus({ preventScroll: true });
+  });
+
+  render();
+  build(false);
+  buildSplash();
+  requestAnimationFrame(splashLoop);
+  requestAnimationFrame(frame);
+  $('start').focus({ preventScroll: true });
+})();
+</script>
+
+<script type="application/octet-stream" id="audio-low">{{AUDIO_LOW}}</script>
+<script type="application/octet-stream" id="audio-high">{{AUDIO_HIGH}}</script>

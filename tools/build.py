@@ -1,12 +1,25 @@
-"""Costruisce le pagine per GitHub Pages dalla versione più recente dell'app.
-- docs/play.html: l'app (scritta in formato artifact, senza <head>) avvolta in un documento completo
-  con viewport, meta per iPhone, manifest, icone e registrazione del service worker.
-- docs/sw.js: service worker con la versione della cache legata al contenuto, così ogni build aggiorna i telefoni.
-Uso: python3 tools/build_pages.py"""
-import glob, hashlib, re
+"""Costruisce l'app e le pagine per GitHub Pages da src/app.html.
+- src/app.html: sorgente dell'app (formato artifact, senza <head>), con {{AUDIO_LOW}} e {{AUDIO_HIGH}} al posto dell'audio.
+- dist/app-artifact.html: sorgente + audio in base64, da pubblicare come artifact su Claude.
+- docs/play.html: la stessa app avvolta in un documento completo (viewport, meta iPhone, manifest, service worker).
+- docs/sw.js: service worker con la cache legata al contenuto, così ogni build aggiorna i telefoni.
+Uso: python3 tools/build.py            (build normale)
+     python3 tools/build.py --snapshot  (in più salva AAAA-MM-GG_8-bit-fire_App_vNN.html con il numero successivo)"""
+import base64, datetime, glob, hashlib, os, re, sys
 
-src = sorted(glob.glob('*_App_v*.html'), key=lambda p: int(re.search(r'_v(\d+)\.html$', p).group(1)))[-1]
-body = open(src, encoding='utf-8').read()
+os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+b64 = lambda f: base64.b64encode(open(f'audio/{f}.m4a', 'rb').read()).decode()
+body = (open('src/app.html', encoding='utf-8').read()
+        .replace('{{AUDIO_LOW}}', b64('fuoco-basso')).replace('{{AUDIO_HIGH}}', b64('fuoco-alto')))
+os.makedirs('dist', exist_ok=True)
+open('dist/app-artifact.html', 'w', encoding='utf-8').write(body)
+src = 'src/app.html'
+
+if '--snapshot' in sys.argv:
+    nums = [int(re.search(r'_v(\d+)\.html$', p).group(1)) for p in glob.glob('*_App_v*.html')]
+    snap = f"{datetime.date.today():%Y-%m-%d}_8-bit-fire_App_v{max(nums, default=0) + 1:02d}.html"
+    open(snap, 'w', encoding='utf-8').write(body)
+    print('snapshot', snap)
 
 HEAD = '''<!doctype html>
 <html lang="it">
@@ -37,13 +50,13 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
 </head>
 <body>
 '''
-page = HEAD + '<!-- generato da ' + src + ' con tools/build_pages.py -->\n' + body + '\n</body>\n</html>\n'
+page = HEAD + '<!-- generato da ' + src + ' con tools/build.py -->\n' + body + '\n</body>\n</html>\n'
 open('docs/play.html', 'w', encoding='utf-8').write(page)
 
 version = hashlib.sha1((page + open('docs/index.html', encoding='utf-8').read()).encode()).hexdigest()[:10]
 open('docs/sw.js', 'w', encoding='utf-8').write(f'''// Service worker di 8-bit fire: l'app funziona anche offline dopo la prima apertura.
 // Pagine: prima la rete (così gli aggiornamenti arrivano), poi la cache. Icone e manifest: prima la cache.
-// Font di Google: cache con aggiornamento in background. Versione generata da tools/build_pages.py.
+// Font di Google: cache con aggiornamento in background. Versione generata da tools/build.py.
 const CACHE = '8bit-fire-{version}';
 const CORE = ['./', 'index.html', 'play.html', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png', 'icons/favicon-32.png'];
